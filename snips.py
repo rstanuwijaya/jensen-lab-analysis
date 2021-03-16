@@ -26,8 +26,8 @@ for i in range(4):
     handle.write('\n')
 
 # %%
-# file = r'Theta=0_2677165_Frame2_Exp500_Bothinc.txt'
-file = '2690816_Frame5_Exp250_iter1.txt'
+file = r'Theta=0_2677165_Frame2_Exp500_Bothinc.txt'
+# file = '2690816_Frame5_Exp250_iter1.txt'
 handle = open(file)
 cnt = 0 
 for line in handle:

@@ -5,6 +5,7 @@ import ccmodel
 import importlib
 import time
 import numpy as np
+import matplotlib.pyplot as plt
 try:
     importlib.reload(ccmodel)   
 except:
@@ -15,11 +16,12 @@ consts = dict()
 consts['number_of_pixels'] = (32, 32)
 consts['regions'] = {
     'left' : ((9, 17), (5, 13)),
-    'right' : ((9, 17), (18, 26))
+    'right' : ((9, 17), (18, 26)),
 }
 consts['regions'] = {
     'left' : ((0, 32), (0, 13)),
-    'right' : ((0, 32), (21, 32))
+    'right' : ((0, 32), (21, 32)),
+    'all': ((0, 32), (0, 32))
 }
 consts['number_of_frames'] = 50000
 consts['jitter_path'] = r"c:\Users\Stefan Tanuwijaya\OneDrive - HKUST Connect\Academics\Jensen Lab\Python codes\ccmodel_v2\_20200926_JitterCali_DropBadPixel.csv"
@@ -31,14 +33,28 @@ print('cwd:', os.getcwd())
 start = time.time()
 
 a = ccmodel.time_bins(r'Theta=0_2677165_Frame2_Exp500_Bothinc', consts, debug=True)
-a.initialize_pixel_self_coincidence_count(2)
-a.initialize_pixel_cross_coincidence_count(2)
+a.initialize_pixel_self_coincidence_count(0)
+plt.imshow(a.pixel_self_coincidence_count)
+plt.colorbar()
+plt.show()
+
+a.initialize_pixel_self_coincidence_count(0, spot=['all'])
+a.pixel_self_coincidence_count[24][16] = 0
+plt.imshow(a.pixel_self_coincidence_count)
+plt.colorbar()
+plt.show()
+
+a.initialize_pixel_cross_coincidence_count(0)
+plt.imshow(a.pixel_cross_coincidence_count)
+plt.colorbar()
+plt.show()
 
 # a.write_to_file()
 # a.save_figures()
 
 end = time.time()
 print('Elapsed Time:', end-start)
+
 # %%
 import numpy as np
 handle = open('test3.txt', 'w')
@@ -69,4 +85,16 @@ print(x_reps, y_reps)
 
 z = x_reps - y_reps
 print(z)
+# %%
+import os
+from dotenv import load_dotenv
+dir_path = os.path.dirname(__file__)
+load_dotenv(os.path.join(dir_path, '.env'), override=True)
+
+TEST = os.getenv('TEST')
+print(TEST)
+# %%
+dir_path = os.path.dirname(__file__)
+
+print(dir_path)
 # %%

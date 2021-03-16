@@ -158,7 +158,7 @@ class time_bins:
             print('Unable to plot coincidence count array', self.name)
         return axs
 
-    def initialize_pixel_self_coincidence_count(self, coincidence_window, spot['left', 'right']):
+    def initialize_pixel_self_coincidence_count(self, coincidence_window, spot = ['left', 'right']):
         '''
         param: coincidence_window
         Initialize pixel self coincidence count
@@ -166,6 +166,7 @@ class time_bins:
         -----
         coincidence_window: int, time window for coincidence_count
         '''
+        if coincidence_window < 0: raise('Coincidence window must be geq 0')
         if self.debug: print(self.name, 'Initializing pixel_self_coincidence_count')
         bins = dict()
         spot = np.array(spot)
@@ -188,7 +189,7 @@ class time_bins:
                 r1 = np.tile(detection_time_bin, detection_time_bin.shape[0])
                 r2 = np.repeat(detection_time_bin, detection_time_bin.shape[0])
                 diff = (r1-r2).reshape(detection_time_bin.shape[0], detection_time_bin.shape[0])
-                coincidence_detection_arg = np.abs(diff) < coincidence_window
+                coincidence_detection_arg = np.abs(diff) <= coincidence_window
                 coincidence_detection_count = np.sum(coincidence_detection_arg, axis=1) - 1
                 coincidence_count = np.zeros(height*width, dtype=int) 
                 coincidence_count[detection_arg] += coincidence_detection_count
@@ -196,6 +197,22 @@ class time_bins:
             Z[start_y:start_y+height, start_x:start_x+width] = total_coincidence_count.reshape(height, width)
             
         self.pixel_self_coincidence_count = Z
+
+    def plot_pixel_self_coincidence_count(self, axs=None):
+        '''
+        param: None
+        return the plot the pixel accumulated count on the given axes.
+
+        ------
+        axs = plt axes subplot
+        '''
+        if self.debug: print(self.name, 'Plotting pixplot_pixel_self_coincidence_count')
+        if axs == None: axs = plt.axes()
+        axs.imshow(self.pixel_self_coincidence_count, cmap='gray')
+        axs.set_xticks(range(0, self.consts['number_of_pixels'][0],4))
+        axs.set_yticks(range(0, self.consts['number_of_pixels'][1],4))
+        axs.grid()
+        return axs
 
     def initialize_pixel_cross_coincidence_count(self, coincidence_window):
         '''
@@ -242,7 +259,7 @@ class time_bins:
             r2 = np.repeat(right_detection_time_bin, left_detection_time_bin.shape[0])
             diff = (r1-r2).reshape(right_detection_time_bin.shape[0], left_detection_time_bin.shape[0])
 
-            coincidence_detection_arg = np.abs(diff) < coincidence_window
+            coincidence_detection_arg = np.abs(diff) <= coincidence_window
 
             left_coincidence_detection_count = np.sum(coincidence_detection_arg, axis=0)
             right_coincidence_detection_count = np.sum(coincidence_detection_arg, axis=1)
@@ -259,6 +276,23 @@ class time_bins:
 
         self.pixel_cross_coincidence_count = Z
 
+    def plot_pixel_cross_coincidence_count(self, axs=None):
+        '''
+        param: None
+        return the plot the pixel accumulated count on the given axes.
+
+        ------
+        axs = plt axes subplot
+        '''
+        if self.debug: print(self.name, 'Plotting pixplot_pixel_cross_coincidence_count')
+        if axs == None: axs = plt.axes()
+        axs.imshow(self.pixel_cross_coincidence_count, cmap='gray')
+        axs.set_xticks(range(0, self.consts['number_of_pixels'][0],4))
+        axs.set_yticks(range(0, self.consts['number_of_pixels'][1],4))
+        axs.grid()
+        return axs
+
+
     def write_to_file(self):
         '''
         param: None
@@ -272,9 +306,18 @@ class time_bins:
         os.makedirs(os.path.join(write_directory, 'time_accumulated_count'), exist_ok=True)
         os.makedirs(os.path.join(write_directory, 'coincidence_count'), exist_ok=True)
 
+        if self.pixel_self_coincidence_count is not None:
+            os.makedirs(os.path.join(write_directory, 'pixel_self_coincidence_count'), exist_ok=True)
+        if self.pixel_cross_coincidence_count is not None:    
+            os.makedirs(os.path.join(write_directory, 'pixel_cross_coincidence_count'), exist_ok=True)
+
         np.savetxt(write_directory + "/pixel_accumulated_count/" + self.name + ".csv", self.pixel_accumulated_count)
         np.savetxt(write_directory + "/time_accumulated_count/" + self.name + ".csv", self.time_accumulated_count)
         np.savetxt(write_directory + "/coincidence_count/" + self.name + ".csv", self.coincidence_count)
+        if self.pixel_self_coincidence_count is not None:
+            np.savetxt(write_directory + "/pixel_self_coincidence_count/" + self.name + ".csv", self.time_accumulated_count)
+        if self.pixel_cross_coincidence_count is not None:    
+            np.savetxt(write_directory + "/pixel_cross_coincidence_count/" + self.name + ".csv", self.time_accumulated_count)
 
     def save_figures(self):
         '''
@@ -288,6 +331,8 @@ class time_bins:
         os.makedirs(os.path.join(write_directory, 'plot_pixel_accumulated_count'), exist_ok=True)
         os.makedirs(os.path.join(write_directory, 'plot_time_accumulated_count'), exist_ok=True)
         os.makedirs(os.path.join(write_directory, 'plot_coincidence_count'), exist_ok=True)
+        os.makedirs(os.path.join(write_directory, 'plot_pixel_self_coincidence_count'), exist_ok=True)
+        os.makedirs(os.path.join(write_directory, 'plot_pixel_cross_coincidence_count'), exist_ok=True)
 
         fig_pixel_accumulated_count = plt.figure(1)
         axs_pixel_accumulated_count = fig_pixel_accumulated_count.add_subplot(111)
@@ -295,17 +340,32 @@ class time_bins:
         plt.savefig(write_directory + "/plot_pixel_accumulated_count/" + self.name + ".png")
         plt.close(fig_pixel_accumulated_count)
 
-        fig_time_accumulated_count = plt.figure(1)
+        fig_time_accumulated_count = plt.figure(2)
         axs_time_accumulated_count = fig_time_accumulated_count.add_subplot(111)
         self.plot_time_accumulated_count(axs_time_accumulated_count)
         plt.savefig(write_directory + "/plot_time_accumulated_count/" + self.name + ".png")
         plt.close(fig_time_accumulated_count)
 
-        fig_coincidence_count = plt.figure(1)
+        fig_coincidence_count = plt.figure(3)
         axs_coincidence_count = fig_coincidence_count.add_subplot(111)
         self.plot_coincidence_count(axs_coincidence_count)
         plt.savefig(write_directory + "/plot_coincidence_count/" + self.name + ".png")
         plt.close(fig_coincidence_count)
+
+        if self.pixel_self_coincidence_count is not None:
+            fig_pixel_self_coincidence_count = plt.figure(4)
+            axs_pixel_self_coincidence_count = fig_pixel_self_coincidence_count.add_subplot(111)
+            self.plot_pixel_self_coincidence_count(axs_pixel_self_coincidence_count)
+            plt.savefig(write_directory + "/plot_pixel_self_coincidence_count/" + self.name + ".png")
+            plt.close(fig_pixel_self_coincidence_count)
+
+        if self.pixel_cross_coincidence_count is not None:
+            fig_pixel_cross_coincidence_count = plt.figure(5)
+            axs_pixel_cross_coincidence_count = fig_pixel_cross_coincidence_count.add_subplot(111)
+            self.plot_pixel_cross_coincidence_count(axs_pixel_cross_coincidence_count)
+            plt.savefig(write_directory + "/plot_pixel_cross_coincidence_count/" + self.name + ".png")
+            plt.close(fig_pixel_cross_coincidence_count)
+
 
     def __init__(self, name, consts, debug=False):
         '''
@@ -328,9 +388,9 @@ class time_bins:
         self.initialize_raw_bins()
         self.initialize_jitter_bins()
         self.initialize_adjusted_bins()
-        # self.initialize_pixel_accumulated_count()
-        # self.initialize_time_accumulated_count()
-        # self.initialize_coincidence_count()
+        self.initialize_pixel_accumulated_count()
+        self.initialize_time_accumulated_count()
+        self.initialize_coincidence_count()
 
     def __str__(self):
         self.plot_pixel_accumulated_count()
