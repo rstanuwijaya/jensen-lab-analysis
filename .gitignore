@@ -1,8 +1,3 @@
 /testdir
-.env
-.gitignore
 *.txt
-test*
-snips.py
-*.csv
-/__pychache__
+test2.py
