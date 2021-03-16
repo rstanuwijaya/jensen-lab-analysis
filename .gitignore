@@ -1,3 +1,5 @@
 /testdir
-*.txt
-test2.py
+test*
+snips.py
+/__pycache__
+*.csv
