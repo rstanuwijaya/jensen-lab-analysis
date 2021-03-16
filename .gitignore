@@ -1,0 +1,5 @@
+/testdir
+test*
+snips.py
+/__pycache__
+*.csv
