@@ -1,0 +1,7 @@
+/testdir
+test.py
+test2.py
+snips.py
+/__pycache__
+*.csv
+.env

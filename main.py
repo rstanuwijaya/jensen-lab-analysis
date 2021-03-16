@@ -59,4 +59,3 @@ for i in range(len(files)):
 
 end_time = time.time()
 print('Total Elapsed Time:', '%d' % ((end_time-start_time)//60) +'m' + '%d' % ((end_time-start_time) % 60) + 's')
-
