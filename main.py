@@ -9,7 +9,6 @@ import numpy as np
 import re
 from dotenv import load_dotenv
 dir_path = os.path.dirname(__file__)
-load_dotenv(os.path.join(dir_path, '.env'), override=True)
 
 try:
     importlib.reload(ccmodel)   
@@ -24,7 +23,6 @@ consts['regions'] = {
 }
 consts['number_of_frames'] = 50000
 consts['jitter_path'] = os.getenv('JITTER_PATH')
-
 consts['working_directory'] = os.getenv('WORKING_DIRECTORY_FINESCAN139')
 consts['write_directory'] = os.path.join(consts['working_directory'], 'analysis')
 
@@ -59,3 +57,5 @@ for i in range(len(files)):
 
 end_time = time.time()
 print('Total Elapsed Time:', '%d' % ((end_time-start_time)//60) +'m' + '%d' % ((end_time-start_time) % 60) + 's')
+
+# %%
