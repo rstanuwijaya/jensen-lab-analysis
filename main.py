@@ -19,7 +19,8 @@ consts = dict()
 consts['number_of_pixels'] = (32, 32)
 consts['regions'] = {
     'left' : ((9, 17), (5, 13)),
-    'right' : ((9, 17), (18, 26))
+    'right' : ((9, 17), (18, 26)),
+    'all': ((0, 32), (0, 32))
 }
 consts['number_of_frames'] = 50000
 consts['jitter_path'] = os.getenv('JITTER_PATH')
@@ -43,6 +44,10 @@ for i in range(len(files)):
 
     print(str(i) + '/' + str(len(files)), files[i], end=' ')
     tb = ccmodel.time_bins(files[i], consts)
+    tb.initialize_pixel_accumulated_count()
+    tb.initialize_time_accumulated_count()
+    tb.initialize_coincidence_count()
+    tb.initialize_pixel_all_coincidence_count(1)
     tb.write_to_file()
     tb.save_figures()
 
@@ -57,5 +62,7 @@ for i in range(len(files)):
 
 end_time = time.time()
 print('Total Elapsed Time:', '%d' % ((end_time-start_time)//60) +'m' + '%d' % ((end_time-start_time) % 60) + 's')
+
+# %%
 
 # %%

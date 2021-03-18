@@ -11,6 +11,7 @@ import os
 import pandas as pd
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
+import scipy.sparse as sp
 from fast_histogram import histogram1d
 
 class time_bins:
@@ -18,28 +19,52 @@ class time_bins:
     jitter_bins = None
     adjusted_bins = None
     pixel_accumulated_count = None
-    ctime_accumulated_count = None
+    time_accumulated_count = None
     debug = False
     consts = None
     name = None
     coincidence_count = None
     pixel_self_coincidence_count = None
     pixel_cross_coincidence_count = None
+    pixel_all_coincidence_count = None
+    cmap = None
 
-    def initialize_raw_bins(self):
+    def initialize_raw_bins(self, mode='npz'):
         if self.debug: print(self.name, 'Initializing raw bins')
-        if os.path.isfile(self.name + '.npy'):
+        if os.path.isfile(self.name + '.npz'):
+            try:
+                sparse_matrix =  sp.load_npz(self.name + '.npz')
+                self.raw_bins = np.array(sparse_matrix.todense())\
+                    .reshape(self.consts['number_of_frames'], self.consts['number_of_pixels'][0], self.consts['number_of_pixels'][1])
+                assert self.raw_bins.shape == (self.consts['number_of_frames'], self.consts['number_of_pixels'][0], self.consts['number_of_pixels'][1])
+            except:
+                print('Failed to load:', self.name + '.npz')
+        elif os.path.isfile(self.name + '.npy'):
             try:
                 self.raw_bins = np.load(self.name + ".npy")
             except:
                 print('Failed to load:', self.name + '.npy')
         elif os.path.isfile(self.name + '.txt'):
             try:
-                self.raw_bins = pd.read_csv(self.name + ".txt", header=None).to_numpy().reshape(self.consts['number_of_frames'], self.consts['number_of_pixels'][0], self.consts['number_of_pixels'][1]).transpose((0,2,1)).astype(np.int16)
-                try:
-                    np.save(self.name + ".npy", self.raw_bins)
-                except:
-                    print('Failed to save:', self.name + '.npy')
+                self.raw_bins = pd.read_csv(self.name + ".txt", header=None)\
+                    .to_numpy()\
+                    .reshape(self.consts['number_of_frames'], self.consts['number_of_pixels'][0], self.consts['number_of_pixels'][1])\
+                    .transpose((0,2,1))\
+                    .astype(np.int16)
+                if mode == 'npz':
+                    try:
+                        sparse_matrix = sp.csr_matrix(self.raw_bins.reshape(self.consts['number_of_frames'], self.consts['number_of_pixels'][0]*self.consts['number_of_pixels'][1]))
+                        sp.save_npz(self.name + '.npz', sparse_matrix)
+                    except Exception as exc:
+                        print('Failed to save:', self.name + '.npz')
+                        raise(exc)
+                elif mode == 'npy':
+                    try:
+                        np.save(self.name + ".npy", self.raw_bins)
+                    except:
+                        print('Failed to save:', self.name + '.npy')
+                else:
+                    print('Mode', mode, 'is not supported')
             except OSError as exc:
                 print('Failed to load:', self.name + '.txt')
                 raise exc
@@ -76,7 +101,7 @@ class time_bins:
         '''
         if self.debug: print(self.name, 'Plotting pixel_accumulated_count')
         if axs == None: axs = plt.axes()
-        img = axs.imshow(self.pixel_accumulated_count, cmap='gray')
+        img = axs.imshow(self.pixel_accumulated_count, cmap=self.cmap)
         region = self.consts['regions']
         for key in region.keys():
             rect = patches.Rectangle((region[key][1][0]-0.5, region[key][0][0]-0.6), region[key][1][1]-region[key][1][0], region[key][0][1]-region[key][0][0], linewidth=1, edgecolor='red', facecolor='none')
@@ -208,7 +233,63 @@ class time_bins:
         '''
         if self.debug: print(self.name, 'Plotting pixplot_pixel_self_coincidence_count')
         if axs == None: axs = plt.axes()
-        img = axs.imshow(self.pixel_self_coincidence_count, cmap='gray')
+        img = axs.imshow(self.pixel_self_coincidence_count, cmap=self.cmap)
+        axs.set_xticks(range(0, self.consts['number_of_pixels'][0],4))
+        axs.set_yticks(range(0, self.consts['number_of_pixels'][1],4))
+        axs.grid()
+        return axs, img
+
+    def initialize_pixel_all_coincidence_count(self, coincidence_window, spot = ['all']):
+        '''
+        param: coincidence_window
+        Initialize pixel self coincidence count
+
+        -----
+        coincidence_window: int, time window for coincidence_count
+        '''
+        if coincidence_window < 0: raise('Coincidence window must be geq 0')
+        if self.debug: print(self.name, 'Initializing pixel_all_coincidence_count')
+        bins = dict()
+        spot = np.array(spot)
+        region = self.consts['regions']
+        Z = np.zeros(self.consts['number_of_pixels'])
+        for key in region.keys():
+            if np.all(spot != key): continue
+            start_x = region[key][1][0]
+            end_x   = region[key][1][1]
+            start_y = region[key][0][0]
+            end_y   = region[key][0][1]
+            height  = end_y - start_y
+            width   = end_x - start_x
+            bins[key] = self.adjusted_bins[:, start_y:end_y, start_x:end_x]
+            total_coincidence_count = np.zeros(height * width, dtype=int)
+            for i in range(self.consts['number_of_frames']):
+                time_bin = bins[key][i].flatten()
+                detection_arg = time_bin.nonzero()
+                detection_time_bin = time_bin[detection_arg]
+                r1 = np.tile(detection_time_bin, detection_time_bin.shape[0])
+                r2 = np.repeat(detection_time_bin, detection_time_bin.shape[0])
+                diff = (r1-r2).reshape(detection_time_bin.shape[0], detection_time_bin.shape[0])
+                coincidence_detection_arg = np.abs(diff) <= coincidence_window
+                coincidence_detection_count = np.sum(coincidence_detection_arg, axis=1) - 1
+                coincidence_count = np.zeros(height*width, dtype=int) 
+                coincidence_count[detection_arg] += coincidence_detection_count
+                total_coincidence_count += coincidence_count
+            Z[start_y:start_y+height, start_x:start_x+width] = total_coincidence_count.reshape(height, width)
+            
+        self.pixel_all_coincidence_count = Z
+
+    def plot_pixel_all_coincidence_count(self, axs=None):
+        '''
+        param: None
+        return the plot the pixel accumulated count on the given axes.
+
+        ------
+        axs = plt axes subplot
+        '''
+        if self.debug: print(self.name, 'Plotting pixplot_pixel_all_coincidence_count')
+        if axs == None: axs = plt.axes()
+        img = axs.imshow(self.pixel_all_coincidence_count, cmap=self.cmap)
         axs.set_xticks(range(0, self.consts['number_of_pixels'][0],4))
         axs.set_yticks(range(0, self.consts['number_of_pixels'][1],4))
         axs.grid()
@@ -286,7 +367,7 @@ class time_bins:
         '''
         if self.debug: print(self.name, 'Plotting pixplot_pixel_cross_coincidence_count')
         if axs == None: axs = plt.axes()
-        img = axs.imshow(self.pixel_cross_coincidence_count, cmap='gray')
+        img =  axs.imshow(self.pixel_cross_coincidence_count, cmap=self.cmap)
         axs.set_xticks(range(0, self.consts['number_of_pixels'][0],4))
         axs.set_yticks(range(0, self.consts['number_of_pixels'][1],4))
         axs.grid()
@@ -313,8 +394,7 @@ class time_bins:
         save('coincidence_count', self.coincidence_count)
         save('pixel_self_coincidence_count', self.pixel_self_coincidence_count)
         save('pixel_cross_coincidence_count', self.pixel_cross_coincidence_count)
-        
-
+        save('pixel_all_coincidence_count', self.pixel_all_coincidence_count)
 
     def save_figures(self):
         '''
@@ -340,7 +420,8 @@ class time_bins:
         plot('plot_time_accumulated_count', self.plot_time_accumulated_count, self.time_accumulated_count, cbar=False)
         plot('plot_coincidence_count', self.plot_coincidence_count, self.coincidence_count, cbar=False)
         plot('plot_pixel_self_coincidence_count', self.plot_pixel_self_coincidence_count, self.pixel_self_coincidence_count, cbar=True)
-        plot('plot_pixel_self_coincidence_count', self.plot_pixel_self_coincidence_count, self.pixel_self_coincidence_count, cbar=True)
+        plot('plot_pixel_cross_coincidence_count', self.plot_pixel_cross_coincidence_count, self.pixel_cross_coincidence_count, cbar=True)
+        plot('plot_pixel_all_coincidence_count', self.plot_pixel_all_coincidence_count, self.pixel_all_coincidence_count, cbar=True)
 
     def __init__(self, name, consts, debug=False):
         '''
@@ -363,9 +444,9 @@ class time_bins:
         self.initialize_raw_bins()
         self.initialize_jitter_bins()
         self.initialize_adjusted_bins()
-        self.initialize_pixel_accumulated_count()
-        self.initialize_time_accumulated_count()
-        self.initialize_coincidence_count()
+        # self.initialize_pixel_accumulated_count()
+        # self.initialize_time_accumulated_count()
+        # self.initialize_coincidence_count()
 
     def __str__(self):
         self.plot_pixel_accumulated_count()

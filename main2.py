@@ -46,11 +46,13 @@ for i in range(len(files)):
 
     print(str(i) + '/' + str(len(files)), files[i], end=' ')
     tb = ccmodel.time_bins(files[i], consts)
+    tb.adjusted_bins[:, 24, 16] = 0
     tb.initialize_pixel_accumulated_count()
     tb.initialize_time_accumulated_count()
     tb.initialize_coincidence_count()
-    tb.initialize_pixel_self_coincidence_count(1, spot=['left', 'right'])
+    tb.initialize_pixel_self_coincidence_count(1)
     tb.initialize_pixel_cross_coincidence_count(1)
+    tb.initialize_pixel_all_coincidence_count(1)
 
     tb.write_to_file()
     tb.save_figures()
@@ -67,5 +69,7 @@ for i in range(len(files)):
 
 end_time = time.time()
 print('Total Elapsed Time:', '%d' % ((end_time-start_time)//60) +'m' + '%d' % ((end_time-start_time) % 60) + 's')
+
+# %%
 
 # %%
