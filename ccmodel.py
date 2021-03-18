@@ -24,6 +24,7 @@ class time_bins:
     consts = None
     name = None
     coincidence_count = None
+    coincidence_count_v2 = None
     pixel_self_coincidence_count = None
     pixel_cross_coincidence_count = None
     pixel_all_coincidence_count = None
@@ -54,7 +55,7 @@ class time_bins:
                 if mode == 'npz':
                     try:
                         sparse_matrix = sp.csr_matrix(self.raw_bins.reshape(self.consts['number_of_frames'], self.consts['number_of_pixels'][0]*self.consts['number_of_pixels'][1]))
-                        sp.save_npz(self.name + '.npz', sparse_matrix)
+                        sp.save_npz(self.name + '.npz', sparse_matrix, compressed=True)
                     except Exception as exc:
                         print('Failed to save:', self.name + '.npz')
                         raise(exc)
@@ -158,7 +159,7 @@ class time_bins:
         
         self.coincidence_count = Z
     
-    def initialize_coincidence_count_v2(self, tw):
+    def initialize_coincidence_count_v2(self, coincidence_window):
         '''
         param: tw
         initialize coincidence count array with time window tolerance of tw
@@ -451,4 +452,70 @@ class time_bins:
     def __str__(self):
         self.plot_pixel_accumulated_count()
         return ''# %%
+# %%
+
+class filter:
+    filter_type = None
+    filter_map = dict()
+    consts = None
+    def initialize_self_filter_map(self):
+        n_px = self.consts['number_of_pixels']
+        r_left = self.consts['regions']['left']
+        r_right = self.consts['regions']['right']
+        filter_self_left = np.zeros((n_px[0], n_px[1]), dtype=bool)
+        filter_self_right = np.zeros((n_px[0], n_px[1]), dtype=bool)
+        filter_self_left[r_left[0][0]:r_left[0][1], r_left[1][0]:r_left[1][1]] = True
+        filter_self_right[r_right[0][0]:r_right[0][1], r_right[1][0]:r_right[1][1]] = True
+        plt.imshow(filter_self_left | filter_self_right)
+        plt.show()
+        filter_self_left_map = filter_self_left.reshape(1, -1) & filter_self_left.reshape(-1, 1)
+        filter_self_right_map = filter_self_right.reshape(1, -1) & filter_self_right.reshape(-1, 1)
+        self.filter_map['self'] = filter_self_left_map | filter_self_right_map
+
+    def initialize_cross_filter_map(self):
+        n_px = self.consts['number_of_pixels']
+        r_left = self.consts['regions']['left']
+        r_right = self.consts['regions']['right']
+        filter_left = np.zeros((n_px[0], n_px[1]), dtype=bool)
+        filter_right = np.zeros((n_px[0], n_px[1]), dtype=bool)
+        filter_left[r_left[0][0]:r_left[0][1], r_left[1][0]:r_left[1][1]] = True
+        filter_right[r_right[0][0]:r_right[0][1], r_right[1][0]:r_right[1][1]] = True
+        filter_cross_map = np.zeros((n_px[0]*n_px[1], n_px[0]*n_px[1]))
+        filter_cross_map[filter_left.reshape(1, n_px[0] * n_px[1]) & filter_right.reshape(n_px[0] * n_px[1], 1)] = True 
+        filter_cross_map[filter_left.reshape(n_px[0] * n_px[1], 1) & filter_right.reshape(1, n_px[0] * n_px[1])] = True 
+        print(filter_left.flatten().nonzero()[0])
+        plt.imshow(filter_cross_map)
+        plt.show()
+        self.filter_map['cross'] = filter_cross_map
+
+    def initialize_nearby_filter_map(self):
+        nearby = np.ones((3,3), dtype=bool)
+        nearby[1][1] = 0
+        n_px = self.consts['number_of_pixels']
+        # print('Nearby region:')
+        # plt.imshow(nearby, cmap='gray')
+        # plt.show()
+        filter_nearby_map = np.zeros((n_px[0]*n_px[1], n_px[0]*n_px[1]))
+
+        for i in range(n_px[0]*n_px[1]):
+            temp = np.zeros((n_px[0], n_px[1]), dtype=bool)
+            nearby_args = np.argwhere(nearby) - [[1, 1]]
+            for arg in nearby_args:
+                y = arg[0] + i//n_px[1]
+                x = arg[1] + i%n_px[1]
+                if y < 0 or x < 0 or y >= n_px[0] or x >= n_px[1]: continue
+                temp[y, x] = 1
+            filter_nearby_map[i] = temp.flatten()
+            self.filter_map['nearby'] = filter_nearby_map
+
+    def plot_filter_map(self):
+        for key in self.filter_map:
+            plt.imshow(self.filter_map[key])
+            plt.show()
+    
+    def __init__(self, consts):
+        self.consts = consts
+        self.initialize_self_filter_map()
+        self.initialize_cross_filter_map()
+        self.initialize_nearby_filter_map()~
 # %%
