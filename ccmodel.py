@@ -466,11 +466,14 @@ class filter:
         filter_self_right = np.zeros((n_px[0], n_px[1]), dtype=bool)
         filter_self_left[r_left[0][0]:r_left[0][1], r_left[1][0]:r_left[1][1]] = True
         filter_self_right[r_right[0][0]:r_right[0][1], r_right[1][0]:r_right[1][1]] = True
-        plt.imshow(filter_self_left | filter_self_right)
-        plt.show()
+        # plt.imshow(filter_self_left | filter_self_right)
+        # plt.show()
         filter_self_left_map = filter_self_left.reshape(1, -1) & filter_self_left.reshape(-1, 1)
         filter_self_right_map = filter_self_right.reshape(1, -1) & filter_self_right.reshape(-1, 1)
-        self.filter_map['self'] = filter_self_left_map | filter_self_right_map
+        filter_self_map = filter_self_left_map | filter_self_right_map
+        for i in range(n_px[0]*n_px[1]):
+            filter_self_map[i][i] = 0
+        self.filter_map['self'] = filter_self_map
 
     def initialize_cross_filter_map(self):
         n_px = self.consts['number_of_pixels']
@@ -483,14 +486,14 @@ class filter:
         filter_cross_map = np.zeros((n_px[0]*n_px[1], n_px[0]*n_px[1]))
         filter_cross_map[filter_left.reshape(1, n_px[0] * n_px[1]) & filter_right.reshape(n_px[0] * n_px[1], 1)] = True 
         filter_cross_map[filter_left.reshape(n_px[0] * n_px[1], 1) & filter_right.reshape(1, n_px[0] * n_px[1])] = True 
-        print(filter_left.flatten().nonzero()[0])
-        plt.imshow(filter_cross_map)
-        plt.show()
+        # plt.imshow(filter_cross_map)
+        # plt.show()
         self.filter_map['cross'] = filter_cross_map
 
     def initialize_nearby_filter_map(self):
-        nearby = np.ones((3,3), dtype=bool)
-        nearby[1][1] = 0
+        radius = 2
+        nearby = np.ones((2*radius + 1, 2*radius+1), dtype=bool)
+        nearby[radius][radius] = 0
         n_px = self.consts['number_of_pixels']
         # print('Nearby region:')
         # plt.imshow(nearby, cmap='gray')
@@ -499,7 +502,7 @@ class filter:
 
         for i in range(n_px[0]*n_px[1]):
             temp = np.zeros((n_px[0], n_px[1]), dtype=bool)
-            nearby_args = np.argwhere(nearby) - [[1, 1]]
+            nearby_args = np.argwhere(nearby) - [[radius, radius]]
             for arg in nearby_args:
                 y = arg[0] + i//n_px[1]
                 x = arg[1] + i%n_px[1]
@@ -509,13 +512,28 @@ class filter:
             self.filter_map['nearby'] = filter_nearby_map
 
     def plot_filter_map(self):
+        n_px = self.consts['number_of_pixels']
+        r_left = self.consts['regions']['left']
+        r_right = self.consts['regions']['right']
+        region = np.zeros((n_px[0], n_px[1]), dtype=int)
+        region[r_left[0][0]:r_left[0][1], r_left[1][0]:r_left[1][1]] = 1
+        region[r_right[0][0]:r_right[0][1], r_right[1][0]:r_right[1][1]] = -1
+        print('Two spots location:')
+        plt.imshow(region)
+        plt.savefig('testdir/simulation/spot.png')
+        plt.show()
         for key in self.filter_map:
+            print('Filter for:', key)
             plt.imshow(self.filter_map[key])
+            plt.xticks(range(0, n_px[0]*n_px[1],8))
+            plt.yticks(range(0, n_px[0]*n_px[1],8))
+            plt.grid()
+            plt.savefig('testdir/simulation/' + key + '.png')
             plt.show()
     
     def __init__(self, consts):
         self.consts = consts
         self.initialize_self_filter_map()
         self.initialize_cross_filter_map()
-        self.initialize_nearby_filter_map()~
+        self.initialize_nearby_filter_map()
 # %%
