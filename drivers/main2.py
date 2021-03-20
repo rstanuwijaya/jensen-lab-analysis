@@ -1,8 +1,13 @@
 # %%
 # main function for two rings metasurface
+import sys
+sys.path
+sys.path.append('..')
+
+from src import ccmodel as ccmodel
+
 import os 
 import pandas as pd
-import ccmodel
 import importlib
 import time
 import numpy as np
@@ -27,7 +32,7 @@ consts['number_of_frames'] = 250000
 consts['jitter_path'] = os.getenv('JITTER_PATH')
 
 consts['working_directory'] = os.getenv('WORKING_DIRECTORY_TWORINGS')
-consts['write_directory'] = os.path.join(consts['working_directory'], 'analysis')
+consts['write_directory'] = os.path.join(consts['working_directory'], 'analysis2')
 
 ld = os.listdir(path=consts['working_directory'])
 files = []
@@ -50,13 +55,12 @@ for i in range(len(files)):
     tb.initialize_pixel_accumulated_count()
     tb.initialize_time_accumulated_count()
     tb.initialize_coincidence_count()
-    tb.initialize_pixel_self_coincidence_count(1)
-    tb.initialize_pixel_cross_coincidence_count(1)
+    # tb.initialize_pixel_self_coincidence_count(1)
+    # tb.initialize_pixel_cross_coincidence_count(1)
     tb.initialize_pixel_all_coincidence_count(1)
 
     tb.write_to_file()
     tb.save_figures()
-
 
     end_iter_time = time.time()
     iter_time = end_iter_time - start_iter_time

@@ -1,8 +1,13 @@
 # %%
 # main function for two spot
+import sys
+sys.path
+sys.path.append('..')
+
+from src import ccmodel as ccmodel
+
 import os 
 import pandas as pd
-import ccmodel
 import importlib
 import time
 import numpy as np

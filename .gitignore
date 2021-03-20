@@ -1,6 +1,6 @@
 /testdir
 test*
 snips.py
-/__pycache__
+__pycache__
 *.csv
 .env

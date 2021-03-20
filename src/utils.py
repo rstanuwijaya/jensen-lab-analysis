@@ -1,8 +1,9 @@
 # %% utility functions
 import os
 
+testdir = '' # input directory path
+
 dirname = os.path.join(os.path.dirname(__file__), 'testdir')
-dirname = r'D:\FTP Server\40-45_+df_HOM scan_C1=0.25\Both Inc_HWP=302.5_Theta=-89'
 
 def count_raw_files(dirname):
     print('Counting the number of files')
@@ -35,8 +36,10 @@ def delete_raw_files(dirname):
         if file.endswith('.txt'):
             os.remove(file)
             print('Deleted', file)
-
-# count_raw_files(dirname)
-# print()
-# delete_raw_files(dirname)
 # %%
+def frames_counter(file):
+    handle = open(file)
+    cnt = 0 
+    for line in handle:
+        cnt += 1
+    print(cnt)

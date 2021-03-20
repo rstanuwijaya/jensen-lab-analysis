@@ -1,8 +1,13 @@
 # %%
 # main function for two rings metasurface HOM Scan
+import sys
+sys.path
+sys.path.append('..')
+
+from src import ccmodel as ccmodel
+
 import os 
 import pandas as pd
-import ccmodel
 import importlib
 import time
 import numpy as np
@@ -27,8 +32,8 @@ consts['regions'] = {
 consts['number_of_frames'] = 50000
 consts['jitter_path'] = os.getenv('JITTER_PATH')
 consts['working_directory'] = os.getenv('WORKING_DIRECTORY_40-45HOMSCAN')
-# dirname = 'Both Inc_HWP=302.5_Theta=-89'
-dirname = 'Ref Inc_HWP=302.5_Theta=-89'
+dirname = 'Both Inc_HWP=302.5_Theta=-89'
+# dirname = 'Ref Inc_HWP=302.5_Theta=-89'
 # dirname = 'SLM Inc_HWP=302.5_Theta=-89'
 consts['working_directory'] = os.path.join(consts['working_directory'], dirname)
 print(consts['working_directory'])
@@ -123,10 +128,3 @@ for file in ld:
 
 coincidence_window = 5
 peak_ref = np.sum(cc[:, 1024-coincidence_window:1024+coincidence_window+1], axis=1)
-
-# %%
-peak = peak_both - (peak_ref + peak_slm)/2
-plt.plot(peak)
-plt.show()
-
-# %%

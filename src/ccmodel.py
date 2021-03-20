@@ -162,13 +162,6 @@ class time_bins:
         
         self.coincidence_count = Z
     
-    def initialize_coincidence_count_v2(self, coincidence_window):
-        '''
-        param: tw
-        initialize coincidence count array with time window tolerance of tw
-        '''
-        pass
-
     def plot_coincidence_count(self, axs=None):
         '''
         param: None
