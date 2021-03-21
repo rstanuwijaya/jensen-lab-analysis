@@ -20,19 +20,19 @@ import scipy.sparse as sp
 from fast_histogram import histogram1d
 
 class time_bins:
+    name = None
+    consts = None
+    modes = None
+    filt = None
+    debug = False
+    cmap = None
     raw_bins = None
     jitter_bins = None
     adjusted_bins = None
     pixel_accumulated_count = None
     time_accumulated_count = None
-    debug = False
-    consts = None
-    name = None
-    cmap = None
-    filt = None
     pixel_coincidence_count = None
     time_coincidence_count = None
-    modes = None
 
     def initialize_raw_bins(self, mode='npz'):
         if self.debug: print(self.name, 'Initializing raw bins')
@@ -116,6 +116,7 @@ class time_bins:
             axs.add_patch(rect)
         axs.set_xticks(range(0, self.consts['number_of_pixels'][0],4))
         axs.set_yticks(range(0, self.consts['number_of_pixels'][1],4))
+        axs.set_title(self.name + '\nPixel accumulated count')
         axs.grid()
         return axs, img
 
@@ -134,6 +135,7 @@ class time_bins:
         if self.debug: print(self.name, 'Plotting time_accumulated_count')
         if axs == None: axs = plt.axes()
         img = axs.plot(self.time_accumulated_count[1:])
+        axs.set_title(self.name + '\nTime accumulated count')
         return axs, img
     
     def initialize_coincidence_count(self, pixel_mode=False, time_mode=False):
@@ -181,6 +183,7 @@ class time_bins:
         axs.set_xticks(range(0, self.consts['number_of_pixels'][0],4))
         axs.set_yticks(range(0, self.consts['number_of_pixels'][1],4))
         axs.grid()
+        axs.set_title(self.name + '\nPixel coincidence count')
         return axs, img
 
     def plot_time_coincidence_count(self, axs=None):
@@ -197,6 +200,7 @@ class time_bins:
         x = np.arange(-1024, 1024+1)
         y = self.time_coincidence_count
         img = axs.plot(x, y)
+        axs.set_title(self.name + '\nTime coincidence count')
         return axs, img
 
     def write_to_file(self):
@@ -219,7 +223,7 @@ class time_bins:
         save('pixel_coincidence_count', self.pixel_coincidence_count)
         save('time_coincidence_count', self.time_coincidence_count)
 
-    def save_figures(self):
+    def save_figures(self, figsize=(8, 6), show_only=False):
         '''
         param: None
         generates all figures and save it to the writing directory.
@@ -232,16 +236,19 @@ class time_bins:
         def plot(plot_name, plot_method, plot_data, cbar=False):
             if plot_data is None: return
             os.makedirs(os.path.join(write_directory, plot_name), exist_ok=True)
-            fig = plt.figure()
+            fig = plt.figure(figsize=figsize)
             axs = fig.add_subplot(111)
             axs, img = plot_method(axs)
             if cbar == True: fig.colorbar(img, ax=axs)
-            plt.savefig(os.path.join(write_directory, plot_name, self.name+'.png'))
+            if not show_only: 
+                plt.savefig(os.path.join(write_directory, plot_name, self.name+'.png'))
+            else:
+                plt.show()
             plt.close()
 
         plot('plot_pixel_accumulated_count', self.plot_pixel_accumulated_count, self.pixel_accumulated_count, cbar=True)
         plot('plot_time_accumulated_count', self.plot_time_accumulated_count, self.time_accumulated_count, cbar=False)
-        plot('plot_pixel_coincidence_count', self.plot_pixel_coincidence_count, self.pixel_coincidence_count, cbar=False)
+        plot('plot_pixel_coincidence_count', self.plot_pixel_coincidence_count, self.pixel_coincidence_count, cbar=True)
         plot('plot_time_coincidence_count', self.plot_time_coincidence_count, self.time_coincidence_count, cbar=False)
 
     def __init__(self, name, consts, modes, filt, debug=False):

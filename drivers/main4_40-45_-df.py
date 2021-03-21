@@ -1,10 +1,11 @@
 # %%
-# main function for two rings metasurface
+# main function for two rings metasurface HOM Scan
+# using ccmodel_v2
 import sys
 sys.path
 sys.path.append('..')
 
-from src import ccmodel as ccmodel
+from src import ccmodel_v2 as ccmodel
 
 import os 
 import pandas as pd
@@ -19,20 +20,41 @@ load_dotenv(os.path.join(dir_path, '.env'), override=True)
 try:
     importlib.reload(ccmodel)   
 except:
-    print('Module is not imported')
+    print('CCmodel have not been imported')
 
 consts = dict()
+modes = dict()
+
+### CONSTS CONFIG - file and directory configuration
+
 consts['number_of_pixels'] = (32, 32)
 consts['regions'] = {
-    'left' : ((0, 32), (0, 13)),
-    'right' : ((0, 32), (21, 32)),
+    'left' : ((13, 21), (3, 11)),
+    'right' : ((13, 21), (21, 29)),
     'all': ((0, 32), (0, 32))
 }
-consts['number_of_frames'] = 250000
+consts['number_of_frames'] = 100000
 consts['jitter_path'] = os.getenv('JITTER_PATH')
+consts['working_directory'] = r'D:\FTP Server\40-45_-df'
+consts['write_directory'] = os.path.join(consts['working_directory'], 'analysis')
+consts['coincidence_window'] = 2
 
-consts['working_directory'] = os.getenv('WORKING_DIRECTORY_TWORINGS')
-consts['write_directory'] = os.path.join(consts['working_directory'], 'analysis2')
+###
+
+### MODES CONFIG - modes[var] = True to set auto initailization
+
+modes['pixel_accumulated_count'] = False
+modes['time_accumulated_count'] = False
+modes['pixel_coincidence_count'] = False
+modes['time_coincidence_count'] = False
+
+###
+
+print('cwd:', os.getcwd())
+
+filt_dict = dict()
+filters =  ccmodel.filter_generator(consts)
+filt = filters.filter_map['nearby']
 
 ld = os.listdir(path=consts['working_directory'])
 files = []
@@ -50,14 +72,16 @@ for i in range(len(files)):
     start_iter_time = time.time()
 
     print(str(i) + '/' + str(len(files)), files[i], end=' ')
-    tb = ccmodel.time_bins(files[i], consts)
-    tb.adjusted_bins[:, 24, 16] = 0
-    tb.initialize_pixel_accumulated_count()
-    tb.initialize_time_accumulated_count()
-    tb.initialize_coincidence_count()
-    # tb.initialize_pixel_self_coincidence_count(1)
-    # tb.initialize_pixel_cross_coincidence_count(1)
-    tb.initialize_pixel_all_coincidence_count(1)
+
+    ### MAIN CONFIG
+
+    tb = ccmodel.time_bins(files[i], consts, modes, filt, debug=False)
+    # tb.adjusted_bins[:, 24, 16] = 0
+    # tb.initialize_pixel_accumulated_count()
+    # tb.initialize_time_accumulated_count()
+    tb.initialize_coincidence_count(pixel_mode=True, time_mode=True)
+
+    ###
 
     tb.write_to_file()
     tb.save_figures()
@@ -74,6 +98,4 @@ for i in range(len(files)):
 end_time = time.time()
 print('Total Elapsed Time:', '%d' % ((end_time-start_time)//60) +'m' + '%d' % ((end_time-start_time) % 60) + 's')
 
-# %%
 
-# %%

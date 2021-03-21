@@ -415,7 +415,7 @@ class time_bins:
         save('pixel_cross_coincidence_count', self.pixel_cross_coincidence_count)
         save('pixel_all_coincidence_count', self.pixel_all_coincidence_count)
 
-    def save_figures(self):
+    def save_figures(self, save_fig=True, show_fig=False):
         '''
         param: None
         generates all figures and save it to the writing directory.
@@ -432,7 +432,8 @@ class time_bins:
             axs = fig.add_subplot(111)
             axs, img = plot_method(axs)
             if cbar == True: fig.colorbar(img, ax=axs)
-            plt.savefig(os.path.join(write_directory, plot_name, self.name+'.png'))
+            if save_fig: plt.savefig(os.path.join(write_directory, plot_name, self.name+'.png'))
+            if show_fig: plt.show()
             plt.close()
 
         plot('plot_pixel_accumulated_count', self.plot_pixel_accumulated_count, self.pixel_accumulated_count, cbar=True)

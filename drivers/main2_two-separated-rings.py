@@ -13,7 +13,7 @@ import time
 import numpy as np
 import re
 from dotenv import load_dotenv
-import utils
+from src import utils
 dir_path = os.path.dirname(__file__)
 load_dotenv(os.path.join(dir_path, '.env'), override=True)
 
@@ -78,53 +78,3 @@ print('Total Elapsed Time:', '%d' % ((end_time-start_time)//60) +'m' + '%d' % ((
 
 # if utils.count_raw_files(consts['working_directory']):
 #     utils.delete_raw_files(consts['working_directory'])
-
-
-# %% analysis
-import os 
-import pandas as pd
-import ccmodel
-import importlib
-import time
-import numpy as np
-import re
-from dotenv import load_dotenv
-import utils
-import matplotlib.pyplot as plt
-dir_path = os.path.dirname(__file__)
-load_dotenv(os.path.join(dir_path, '.env'), override=True)
-
-try:
-    importlib.reload(ccmodel)   
-except:
-    print('Module is not imported')
-
-consts = dict()
-consts['number_of_pixels'] = (32, 32)
-consts['regions'] = {
-    'left' : ((13, 21), (3, 11)),
-    'right' : ((13, 21), (21, 29)),
-    'all': ((0, 32), (0, 32))
-}
-consts['number_of_frames'] = 50000
-consts['jitter_path'] = os.getenv('JITTER_PATH')
-consts['working_directory'] = os.getenv('WORKING_DIRECTORY_40-45HOMSCAN')
-# dirname = 'Both Inc_HWP=302.5_Theta=-89'
-dirname = 'Ref Inc_HWP=302.5_Theta=-89'
-# dirname = 'SLM Inc_HWP=302.5_Theta=-89'
-consts['working_directory'] = os.path.join(consts['working_directory'], dirname)
-path = os.path.join(consts['working_directory'], 'analysis', 'coincidence_count')
-
-os.chdir(path)
-print(path)
-ld = os.listdir(path)
-times = np.array([])
-cc = np.zeros((len(ld), 1024*2+1))
-i = 0
-
-for file in ld:
-    cc[i] = np.loadtxt(file)
-    i += 1
-
-coincidence_window = 5
-peak_ref = np.sum(cc[:, 1024-coincidence_window:1024+coincidence_window+1], axis=1)
