@@ -32,7 +32,7 @@ def backend(query):
         'all': ((0, 32), (0, 32))
     }
     consts['number_of_frames'] = query['number_of_frames']
-    consts['jitter_path'] = os.getenv('JITTER_PATH')
+    consts['jitter_path'] = query['jitter_path']
     consts['working_directory'] = query['working_directory']
     consts['write_directory'] = os.path.join(consts['working_directory'], 'analysis')
     consts['coincidence_window'] = query['coincidence_window']
