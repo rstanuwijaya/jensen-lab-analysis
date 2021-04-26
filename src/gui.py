@@ -80,7 +80,7 @@ class App(QWidget):
 
         def wrap_query():
             self.query['working_directory'] = ledit_wkdir.text()
-            self.query['jitter_path'] = ledit_wkdir.text()
+            self.query['jitter_path'] = ledit_jitter.text()
             with open('config.json', 'w') as f:
                 json.dump(self.query, f, indent=2)
             self.backend_request()
