@@ -3,3 +3,4 @@ test*
 snips.py
 __pycache__
 .env
+/.vscode

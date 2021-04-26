@@ -1,0 +1,44 @@
+{
+  "working_directory": "C:/Users/stnav/OneDrive - HKUST Connect/Academics/Jensen Lab/Python codes/ccmodel_v2/example",
+  "regions": {
+    "left": [
+      [
+        13,
+        21
+      ],
+      [
+        3,
+        11
+      ]
+    ],
+    "right": [
+      [
+        13,
+        21
+      ],
+      [
+        21,
+        29
+      ]
+    ],
+    "all": [
+      [
+        0,
+        32
+      ],
+      [
+        0,
+        32
+      ]
+    ]
+  },
+  "number_of_frames": 1000,
+  "coincidence_window": 2,
+  "modes": {
+    "pixel_accumulated_count": true,
+    "time_accumulated_count": true,
+    "pixel_coincidence_count": true,
+    "time_coincidence_count": true
+  },
+  "filter_map": "nearby"
+}
