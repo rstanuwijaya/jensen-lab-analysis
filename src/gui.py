@@ -4,9 +4,9 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import pyqtSlot, QObject, pyqtSignal, QThread
 from main import backend
 
+import time
 import os
 import json
-
 
 class Stream(QObject):
     newText = pyqtSignal(str)
@@ -95,7 +95,8 @@ class App(QWidget):
             self.query['number_of_frames'] = int(ledit_nof.text())
             with open(os.path.join(os.path.dirname(sys.executable), 'config.json'), 'w') as f:
                 json.dump(self.query, f, indent=2)
-            self.backend_request(self.query)
+            self.backend_request = self.backend_worker(self.query)
+            self.backend_request.start()
             os.chdir(os.path.dirname(__file__))
 
     def openWkdirDialog(self, line):
@@ -110,12 +111,16 @@ class App(QWidget):
         print(f'Jitter Path: {path[0]}')
         line.setText(path[0])
 
-    class backend_request(QThread):
+    class backend_worker(QThread):
         def __init__(self, query):
             QThread.__init__(self)
+            self.query = query
+        def __del__(self):
+            self.wait()
+        def run(self):
             print('----------------------------------------------')
             print('Calling backend')
-            backend(query)
+            backend(self.query)
 
 
 if __name__ == '__main__':
