@@ -14,6 +14,8 @@ def version():
 import numpy as np
 import os
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import scipy.sparse as sp

@@ -4,22 +4,22 @@
   "regions": {
     "left": [
       [
-        13,
-        21
+        9,
+        17
       ],
       [
-        3,
-        11
+        5,
+        13
       ]
     ],
     "right": [
       [
-        13,
-        21
+        9,
+        17
       ],
       [
-        21,
-        29
+        18,
+        26
       ]
     ],
     "all": [
@@ -33,7 +33,7 @@
       ]
     ]
   },
-  "number_of_frames": 1000,
+  "number_of_frames": 50000,
   "coincidence_window": 2,
   "modes": {
     "pixel_accumulated_count": true,

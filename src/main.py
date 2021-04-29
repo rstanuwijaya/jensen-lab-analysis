@@ -27,9 +27,9 @@ def backend(query):
 
     consts['number_of_pixels'] = (32, 32)
     consts['regions'] = {
-        'left' : ((13, 21), (3, 11)),
-        'right' : ((13, 21), (21, 29)),
-        'all': ((0, 32), (0, 32))
+        'left' : ((query['regions']['left'][0][0], query['regions']['left'][0][1]), (query['regions']['left'][1][0], query['regions']['left'][1][1])),
+        'right' : ((query['regions']['right'][0][0], query['regions']['right'][0][1]), (query['regions']['right'][1][0], query['regions']['right'][1][1])),
+        'all': ((query['regions']['all'][0][0], query['regions']['all'][0][1]), (query['regions']['all'][1][0], query['regions']['all'][1][1])),
     }
     consts['number_of_frames'] = query['number_of_frames']
     consts['jitter_path'] = query['jitter_path']

@@ -23,9 +23,8 @@ class App(QWidget):
         self.setWindowIcon(QIcon())
         self.setGeometry(50, 50, 500, 300)
         sys.stdout = Stream(newText=self.onUpdateText)
-        self.query = {'working_directory': None}
-        os.chdir(os.path.dirname(__file__))
-        with open('config.json', 'r') as f:
+        self.query = dict()
+        with open(os.path.join(os.path.dirname(sys.executable), 'config.json'), 'r') as f:
             self.query = json.load(f)
         self.backgroundThread = QThread()
         self.initUI()
@@ -50,7 +49,7 @@ class App(QWidget):
         label_wkdir = QLabel('Working Directory:')
         label_wkdir.setMinimumWidth(120)
         wkdir_layout.addWidget(label_wkdir)
-        ledit_wkdir = QLineEdit(self.query['working_directory'])
+        ledit_wkdir = QLineEdit(os.path.abspath(self.query['working_directory']))
         wkdir_layout.addWidget(ledit_wkdir)
         btn_wkdir = QPushButton('Select Folder', self)
         btn_wkdir.setMinimumWidth(100)
@@ -61,7 +60,7 @@ class App(QWidget):
         label_jitter = QLabel('Jitter File:')
         label_jitter.setMinimumWidth(120)
         jitter_layout.addWidget(label_jitter)
-        ledit_jitter = QLineEdit(self.query['jitter_path'])
+        ledit_jitter = QLineEdit(os.path.abspath(self.query['jitter_path']))
         jitter_layout.addWidget(ledit_jitter)
         btn_jitter = QPushButton('Select File', self)
         btn_jitter.setMinimumWidth(100)
@@ -97,6 +96,8 @@ class App(QWidget):
                 json.dump(self.query, f, indent=2)
             self.backend_request = self.backend_worker(self.query)
             self.backend_request.start()
+            btn_submit.setEnabled(False)
+            self.backend_request.finished.connect(lambda: btn_submit.setEnabled(True))
             os.chdir(os.path.dirname(__file__))
 
     def openWkdirDialog(self, line):
@@ -121,7 +122,6 @@ class App(QWidget):
             print('----------------------------------------------')
             print('Calling backend')
             backend(self.query)
-
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
