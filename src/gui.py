@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
-from PyQt5.QtCore import pyqtSlot, QObject, pyqtSignal
+from PyQt5.QtCore import pyqtSlot, QObject, pyqtSignal, QThread
 from main import backend
 
 import os
@@ -27,6 +27,7 @@ class App(QWidget):
         os.chdir(os.path.dirname(__file__))
         with open('config.json', 'r') as f:
             self.query = json.load(f)
+        self.backgroundThread = QThread()
         self.initUI()
 
     def onUpdateText(self, text):
@@ -94,7 +95,7 @@ class App(QWidget):
             self.query['number_of_frames'] = int(ledit_nof.text())
             with open(os.path.join(os.path.dirname(sys.executable), 'config.json'), 'w') as f:
                 json.dump(self.query, f, indent=2)
-            self.backend_request()
+            self.backend_request(self.query)
             os.chdir(os.path.dirname(__file__))
 
     def openWkdirDialog(self, line):
@@ -109,10 +110,12 @@ class App(QWidget):
         print(f'Jitter Path: {path[0]}')
         line.setText(path[0])
 
-    def backend_request(self):
-        print('----------------------------------------------')
-        print('Calling backend')
-        backend(self.query)
+    class backend_request(QThread):
+        def __init__(self, query):
+            QThread.__init__(self)
+            print('----------------------------------------------')
+            print('Calling backend')
+            backend(query)
 
 
 if __name__ == '__main__':
