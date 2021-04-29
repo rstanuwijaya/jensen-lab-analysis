@@ -24,7 +24,8 @@ class App(QWidget):
         self.setGeometry(50, 50, 500, 300)
         sys.stdout = Stream(newText=self.onUpdateText)
         self.query = dict()
-        with open(os.path.join(os.path.dirname(sys.executable), 'config.json'), 'r') as f:
+        self.fconfig = os.path.join(os.path.dirname(__file__), 'config.json')
+        with open(self.fconfig, 'r') as f:
             self.query = json.load(f)
         self.backgroundThread = QThread()
         self.initUI()
@@ -85,6 +86,7 @@ class App(QWidget):
         self.console = QTextEdit(self)
         self.console.setReadOnly(True)
         layout.addWidget(self.console)
+        print(self.fconfig)
 
         self.show()
 
@@ -92,13 +94,13 @@ class App(QWidget):
             self.query['working_directory'] = ledit_wkdir.text()
             self.query['jitter_path'] = ledit_jitter.text()
             self.query['number_of_frames'] = int(ledit_nof.text())
-            with open(os.path.join(os.path.dirname(sys.executable), 'config.json'), 'w') as f:
+            with open(os.path.join(os.path.dirname(__file__), 'config.json'), 'w') as f:
                 json.dump(self.query, f, indent=2)
             self.backend_request = self.backend_worker(self.query)
             self.backend_request.start()
             btn_submit.setEnabled(False)
             self.backend_request.finished.connect(lambda: btn_submit.setEnabled(True))
-            os.chdir(os.path.dirname(sys.executable))
+            os.chdir(os.path.dirname(__file__))
 
     def openWkdirDialog(self, line):
         options = QFileDialog.Options(QFileDialog.ShowDirsOnly)
