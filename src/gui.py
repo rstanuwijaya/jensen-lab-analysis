@@ -98,7 +98,7 @@ class App(QWidget):
             self.backend_request.start()
             btn_submit.setEnabled(False)
             self.backend_request.finished.connect(lambda: btn_submit.setEnabled(True))
-            os.chdir(os.path.dirname(__file__))
+            os.chdir(os.path.dirname(sys.executable))
 
     def openWkdirDialog(self, line):
         options = QFileDialog.Options(QFileDialog.ShowDirsOnly)
