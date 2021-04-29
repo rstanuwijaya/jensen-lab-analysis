@@ -31,10 +31,10 @@ class App(QWidget):
 
     def onUpdateText(self, text):
         # self.console.append(text)
-        cursor = self.console.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        cursor.insertText(text)
-        self.console.setTextCursor(cursor)
+        self.cursor = self.console.textCursor()
+        self.cursor.movePosition(QTextCursor.End)
+        self.cursor.insertText(text)
+        self.console.setTextCursor(self.cursor)
         self.console.ensureCursorVisible()
 
     def __del__(self):
@@ -67,8 +67,16 @@ class App(QWidget):
         btn_jitter.clicked.connect(lambda: self.openJitterDialog(ledit_jitter))
         jitter_layout.addWidget(btn_jitter)
 
+        nof_layout = QHBoxLayout()
+        label_nof = QLabel('Num of Frames:')
+        label_nof.setMinimumWidth(120)
+        nof_layout.addWidget(label_nof)
+        ledit_nof = QLineEdit(str(self.query['number_of_frames']))
+        nof_layout.addWidget(ledit_nof)
+
         layout.addLayout(wkdir_layout, 0, 0)
         layout.addLayout(jitter_layout, 1, 0)
+        layout.addLayout(nof_layout, 2, 0)
 
         btn_submit = QPushButton('Submit', self)
         btn_submit.clicked.connect(lambda: wrap_query())
@@ -83,7 +91,8 @@ class App(QWidget):
         def wrap_query():
             self.query['working_directory'] = ledit_wkdir.text()
             self.query['jitter_path'] = ledit_jitter.text()
-            with open('config.json', 'w') as f:
+            self.query['number_of_frames'] = int(ledit_nof.text())
+            with open(os.path.join(os.path.dirname(sys.executable), 'config.json'), 'w') as f:
                 json.dump(self.query, f, indent=2)
             self.backend_request()
             os.chdir(os.path.dirname(__file__))
@@ -96,9 +105,9 @@ class App(QWidget):
 
     def openJitterDialog(self, line):
         options = QFileDialog.Options()
-        path = QFileDialog.getOpenFileName(self, "Select File", ".csv")
-        print(f'Jitter Path: {path}')
-        line.setText(path)
+        path = QFileDialog.getOpenFileName(self, "Select File", ".")
+        print(f'Jitter Path: {path[0]}')
+        line.setText(path[0])
 
     def backend_request(self):
         print('----------------------------------------------')

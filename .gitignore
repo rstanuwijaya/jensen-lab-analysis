@@ -4,3 +4,6 @@ snips.py
 __pycache__
 .env
 /.vscode
+*.spec
+/build
+/dist
