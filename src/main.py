@@ -48,8 +48,7 @@ def backend(query):
 
     ###
 
-    print('cwd:', os.getcwd())
-
+    print('Working Directory at: {}'.format(consts['working_directory']))
     filt_dict = dict()
     filters =  ccmodel.filter_generator(consts)
     filt = filters.filter_map[query['filter_map']]

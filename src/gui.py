@@ -75,18 +75,26 @@ class App(QWidget):
         ledit_nof = QLineEdit(str(self.query['number_of_frames']))
         nof_layout.addWidget(ledit_nof)
 
+        tcw_layout = QHBoxLayout()
+        label_tcw = QLabel('Coincidence Window:')
+        label_tcw.setMinimumWidth(120)
+        tcw_layout.addWidget(label_tcw)
+        ledit_tcw = QLineEdit(str(self.query['coincidence_window']))
+        tcw_layout.addWidget(ledit_tcw)
+
         layout.addLayout(wkdir_layout, 0, 0)
         layout.addLayout(jitter_layout, 1, 0)
         layout.addLayout(nof_layout, 2, 0)
+        layout.addLayout(tcw_layout, 3, 0)
 
-        btn_submit = QPushButton('Submit', self)
+        btn_submit = QPushButton('Run', self)
         btn_submit.clicked.connect(lambda: wrap_query())
         layout.addWidget(btn_submit)
 
         self.console = QTextEdit(self)
         self.console.setReadOnly(True)
         layout.addWidget(self.console)
-        print(self.fconfig)
+        print(f'Reading Config from: {self.fconfig}')
 
         self.show()
 
@@ -94,6 +102,7 @@ class App(QWidget):
             self.query['working_directory'] = ledit_wkdir.text()
             self.query['jitter_path'] = ledit_jitter.text()
             self.query['number_of_frames'] = int(ledit_nof.text())
+            self.query['coincidence_window'] = int(ledit_tcw.text())
             with open(os.path.join(os.path.dirname(__file__), 'config.json'), 'w') as f:
                 json.dump(self.query, f, indent=2)
             self.backend_request = self.backend_worker(self.query)
@@ -122,7 +131,7 @@ class App(QWidget):
             self.wait()
         def run(self):
             print('----------------------------------------------')
-            print('Calling backend')
+            print('Processing Query')
             backend(self.query)
 
 if __name__ == '__main__':
