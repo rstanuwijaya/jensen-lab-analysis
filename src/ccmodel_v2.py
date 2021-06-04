@@ -153,12 +153,12 @@ class time_bins:
         if pixel_mode: pixel_coincidence_count = np.zeros(num_px, dtype=int)
         if time_mode: time_coincidence_count = np.zeros(max_tb*2 + 1)
         for i in range(consts['number_of_frames']):
+            A = adjusted_bins[i].flatten()
+            D = A.nonzero()
+            A_D = A[D]
+            T_D = A_D.reshape(1, -1) - A_D.reshape(-1, 1)
+            F_D = F[D].transpose()[D]
             if pixel_mode:
-                A = adjusted_bins[i].flatten()
-                D = A.nonzero()
-                A_D = A[D]
-                T_D = A_D.reshape(1, -1) - A_D.reshape(-1, 1)
-                F_D = F[D].transpose()[D]
                 C_D = F_D & (np.abs(T_D) <= cw)
                 R_D = np.sum(C_D, axis=1)
                 R = np.zeros(height*width, dtype=int)
