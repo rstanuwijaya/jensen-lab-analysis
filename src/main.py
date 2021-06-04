@@ -53,7 +53,7 @@ def backend(query):
     filters =  ccmodel.filter_generator(consts)
     filt = filters.filter_map[query['filter_map']]
 
-    ld = os.listdir(path=consts['working_directory'])
+    ld = sorted(os.listdir(path=consts['working_directory']))
     files = set()
     times = np.array([])
 
