@@ -1,6 +1,4 @@
-
 # %%
-# ccmodel_v2.py:
 '''
 About ccmodel:
 
@@ -9,23 +7,27 @@ v2: refactored signifacnt amount of code for optimization.
 Analysis tool for the data produced by pf32 camera - picosecond time resolved 32-by-32 pixels camera.
 '''
 def version():
-    print('CCmodel_v2')
+    print('CCmodel_v3')
 
 import numpy as np
 import os
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import scipy.sparse as sp
 from fast_histogram import histogram1d
 
-class time_bins:
+from . import utils
+from . import filter
+
+class time_bin:
+    path = None
     name = None
     consts = None
+    ext = None
     modes = None
-    filt = None
+    filter = None
     debug = False
     cmap = None
     raw_bins = None
@@ -38,52 +40,20 @@ class time_bins:
 
     def initialize_raw_bins(self, mode='npz'):
         if self.debug: print(self.name, 'Initializing raw bins')
-        if os.path.isfile(self.name + '.npz'):
-            try:
-                sparse_matrix =  sp.load_npz(self.name + '.npz')
-                self.raw_bins = np.array(sparse_matrix.todense())\
-                    .reshape((-1, self.consts['number_of_pixels'][0], self.consts['number_of_pixels'][1]))[:self.consts['number_of_frames']]
-            except:
-                print('Failed to load:', self.name + '.npz')
-        elif os.path.isfile(self.name + '.npy'):
-            try:
-                self.raw_bins = np.load(self.name + ".npy")
-            except:
-                print('Failed to load:', self.name + '.npy')
-        elif os.path.isfile(self.name + '.txt'):
-            try:
-                self.raw_bins = pd.read_csv(self.name + ".txt", header=None)\
-                    .to_numpy()\
-                    .reshape(self.consts['number_of_frames'], self.consts['number_of_pixels'][0], self.consts['number_of_pixels'][1])\
-                    .transpose((0,2,1))\
-                    .astype(np.int16)
-                if mode == 'npz':
-                    try:
-                        sparse_matrix = sp.csr_matrix(self.raw_bins.reshape(self.consts['number_of_frames'], self.consts['number_of_pixels'][0]*self.consts['number_of_pixels'][1]))
-                        sp.save_npz(self.name + '.npz', sparse_matrix, compressed=True)
-                    except Exception as exc:
-                        print('Failed to save:', self.name + '.npz')
-                        raise(exc)
-                elif mode == 'npy':
-                    try:
-                        np.save(self.name + ".npy", self.raw_bins)
-                    except:
-                        print('Faiselled to save:', self.name + '.npy')
-                else:
-                    print('Mode', mode, 'is not supported')
-            except OSError as exc:
-                print('Failed to load:', self.name + '.txt')
-                raise exc
-        else:
-            print('File does not exist:', self.name)
+        try:
+            self.raw_bins = utils.load(self.path)
+        except Exception as exc:
+            raise(exc)
 
     def initialize_jitter_bins(self):
+        n_px = self.consts['number_of_pixels']
         if self.debug: print(self.name, 'Initializing jitter bins')
         jitter_path = self.consts['jitter_path']
         try:
-            self.jitter_bins = pd.read_csv(jitter_path)["Jitter"].to_numpy().round().astype(int).reshape(32,32)
-        except:
+            self.jitter_bins = pd.read_csv(jitter_path)["Jitter"].to_numpy().round().astype(int).reshape(n_px,n_px)
+        except Exception as exc:
             print('Failed to load jitter file')
+            raise(exc)
 
     def initialize_adjusted_bins(self):
         if self.debug: print(self.name, 'Initializing adjusted bins')
@@ -114,10 +84,10 @@ class time_bins:
             raise
         region = self.consts['regions']
         for key in region.keys():
-            rect = patches.Rectangle((region[key][1][0]-0.5, region[key][0][0]-0.6), region[key][1][1]-region[key][1][0], region[key][0][1]-region[key][0][0], linewidth=1, edgecolor='red', facecolor='none')
+            rect = patches.Rectangle((region[key]['left']-0.5, region[key]['up']-0.6), region[key]['right']-region[key]['left'], region[key]['bottom']-region[key]['up'], linewidth=1, edgecolor='red', facecolor='none')
             axs.add_patch(rect)
-        axs.set_xticks(range(0, self.consts['number_of_pixels'][0],4))
-        axs.set_yticks(range(0, self.consts['number_of_pixels'][1],4))
+        axs.set_xticks(range(0, self.consts['number_of_pixels'],4))
+        axs.set_yticks(range(0, self.consts['number_of_pixels'],4))
         axs.set_title(self.name + '\nPixel accumulated count')
         axs.grid()
         return axs, img
@@ -142,17 +112,17 @@ class time_bins:
     
     def initialize_coincidence_count(self, pixel_mode=False, time_mode=False):
         if self.debug: print(self.name, 'Initializing pixel and time coincidence_count')
-        consts = self.consts
-        height = self.consts['number_of_pixels'][0]
-        width = self.consts['number_of_pixels'][1]
+        n_px = self.consts['number_of_pixels']
+        height = n_px
+        width = n_px
         num_px = height * width
         adjusted_bins = self.adjusted_bins
         cw = self.consts['coincidence_window']
         max_tb = 1024
-        F = self.filt
+        F = self.filter
         if pixel_mode: pixel_coincidence_count = np.zeros(num_px, dtype=int)
         if time_mode: time_coincidence_count = np.zeros(max_tb*2 + 1)
-        for i in range(consts['number_of_frames']):
+        for i in range(adjusted_bins.shape[0]):
             A = adjusted_bins[i].flatten()
             D = A.nonzero()
             A_D = A[D]
@@ -182,8 +152,8 @@ class time_bins:
         if self.pixel_coincidence_count is None: return
         if axs == None: axs = plt.axes()
         img = axs.imshow(self.pixel_coincidence_count, cmap=self.cmap)
-        axs.set_xticks(range(0, self.consts['number_of_pixels'][0],4))
-        axs.set_yticks(range(0, self.consts['number_of_pixels'][1],4))
+        axs.set_xticks(range(0, self.consts['number_of_pixels'],4))
+        axs.set_yticks(range(0, self.consts['number_of_pixels'],4))
         axs.grid()
         axs.set_title(self.name + '\nPixel coincidence count')
         return axs, img
@@ -220,10 +190,10 @@ class time_bins:
             os.makedirs(os.path.join(write_directory, save_name), exist_ok=True)
             np.savetxt(os.path.join(write_directory, save_name, self.name+'.csv'), save_data)
 
-        save('pixel_accumulated_count', self.pixel_accumulated_count)
-        save('time_accumulated_count', self.time_accumulated_count)
-        save('pixel_coincidence_count', self.pixel_coincidence_count)
-        save('time_coincidence_count', self.time_coincidence_count)
+        save('data_pixel_accumulated_count', self.pixel_accumulated_count)
+        save('data_time_accumulated_count', self.time_accumulated_count)
+        save('data_pixel_coincidence_count', self.pixel_coincidence_count)
+        save('data_time_coincidence_count', self.time_coincidence_count)
 
     def save_figures(self, figsize=(8, 6), show_only=False):
         '''
@@ -253,7 +223,7 @@ class time_bins:
         plot('plot_pixel_coincidence_count', self.plot_pixel_coincidence_count, self.pixel_coincidence_count, cbar=True)
         plot('plot_time_coincidence_count', self.plot_time_coincidence_count, self.time_coincidence_count, cbar=False)
 
-    def __init__(self, name, consts, modes, filt, debug=False):
+    def __init__(self, path, consts, filter, debug=False, init_only=False):
         '''
         param: name, consts
         initialize the parameters of the model.
@@ -263,11 +233,11 @@ class time_bins:
         consts: dict, dictionary containing the constants
         '''
         # pack constructor parameters
+        self.path = path
+        self.name , self.ext = os.path.splitext(os.path.basename(path))
         self.consts = consts
         self.debug = debug
-        self.name = name
-        self.modes = modes
-        self.filt = filt
+        self.filter = filter
 
         # set working directory
         os.chdir(self.consts['working_directory'])
@@ -276,105 +246,16 @@ class time_bins:
         self.initialize_raw_bins()
         self.initialize_jitter_bins()
         self.initialize_adjusted_bins()
-        if self.modes['pixel_accumulated_count']: 
-            self.initialize_pixel_accumulated_count()
-        if self.modes['time_accumulated_count']:    
-            self.initialize_time_accumulated_count()
-        if self.modes['pixel_coincidence_count'] or self.modes['time_coincidence_count']:    
-            self.initialize_coincidence_count(self.modes['pixel_coincidence_count'], self.modes['time_coincidence_count'])
+        if not init_only:
+            if self.consts['modes']['pixel_accumulated_count']: 
+                self.initialize_pixel_accumulated_count()
+            if self.consts['modes']['time_accumulated_count']:    
+                self.initialize_time_accumulated_count()
+            if self.consts['modes']['pixel_coincidence_count'] or self.consts['modes']['time_coincidence_count']:    
+                self.initialize_coincidence_count(self.consts['modes']['pixel_coincidence_count'], self.consts['modes']['time_coincidence_count'])
 
     def __str__(self):
         self.plot_pixel_accumulated_count()
         return ''      
 
-# %%
-
-class filter_generator:
-    filter_type = None
-    filter_map = dict()
-    consts = None
-    def initialize_self_filter_map(self):
-        n_px = self.consts['number_of_pixels']
-        r_left = self.consts['regions']['left']
-        r_right = self.consts['regions']['right']
-        filter_self_left = np.zeros((n_px[0], n_px[1]), dtype=bool)
-        filter_self_right = np.zeros((n_px[0], n_px[1]), dtype=bool)
-        filter_self_left[r_left[0][0]:r_left[0][1], r_left[1][0]:r_left[1][1]] = True
-        filter_self_right[r_right[0][0]:r_right[0][1], r_right[1][0]:r_right[1][1]] = True
-        # plt.imshow(filter_self_left | filter_self_right)
-        # plt.show()
-        filter_self_left_map = filter_self_left.reshape(1, -1) & filter_self_left.reshape(-1, 1)
-        filter_self_right_map = filter_self_right.reshape(1, -1) & filter_self_right.reshape(-1, 1)
-        filter_self_map = filter_self_left_map | filter_self_right_map
-        for i in range(n_px[0]*n_px[1]):
-            filter_self_map[i][i] = 0
-        self.filter_map['self'] = filter_self_map
-
-    def initialize_cross_filter_map(self):
-        n_px = self.consts['number_of_pixels']
-        r_left = self.consts['regions']['left']
-        r_right = self.consts['regions']['right']
-        filter_left = np.zeros((n_px[0], n_px[1]), dtype=bool)
-        filter_right = np.zeros((n_px[0], n_px[1]), dtype=bool)
-        filter_left[r_left[0][0]:r_left[0][1], r_left[1][0]:r_left[1][1]] = True
-        filter_right[r_right[0][0]:r_right[0][1], r_right[1][0]:r_right[1][1]] = True
-        filter_cross_map = np.zeros((n_px[0]*n_px[1], n_px[0]*n_px[1]), dtype=bool)
-        filter_cross_map[filter_left.reshape(1, n_px[0] * n_px[1]) & filter_right.reshape(n_px[0] * n_px[1], 1)] = True 
-        filter_cross_map[filter_left.reshape(n_px[0] * n_px[1], 1) & filter_right.reshape(1, n_px[0] * n_px[1])] = True 
-        # plt.imshow(filter_cross_map)
-        # plt.show()
-        self.filter_map['cross'] = filter_cross_map
-
-    def initialize_nearby_filter_map(self, radius = 1):
-        nearby = np.ones((2*radius + 1, 2*radius+1), dtype=bool)
-        nearby[radius][radius] = 0
-        n_px = self.consts['number_of_pixels']
-        # print('Nearby region:')
-        # plt.imshow(nearby, cmap='gray')
-        # plt.show()
-        filter_nearby_map = np.zeros((n_px[0]*n_px[1], n_px[0]*n_px[1]), dtype=bool)
-
-        for i in range(n_px[0]*n_px[1]):
-            temp = np.zeros((n_px[0], n_px[1]), dtype=bool)
-            nearby_args = np.argwhere(nearby) - [[radius, radius]]
-            for arg in nearby_args:
-                y = arg[0] + i//n_px[1]
-                x = arg[1] + i%n_px[1]
-                if y < 0 or x < 0 or y >= n_px[0] or x >= n_px[1]: continue
-                temp[y, x] = 1
-            filter_nearby_map[i] = temp.flatten()
-            self.filter_map['nearby'] = filter_nearby_map
-
-    def initialize_all_map(self):
-        n_px = self.consts['number_of_pixels']
-        filter_all_map = np.ones((n_px[0] * n_px[1], n_px[0] * n_px[1]), dtype=bool)
-        diag = (np.arange(1, n_px[0] * n_px[1]), np.arange(1, n_px[0] * n_px[1]))
-        filter_all_map[diag] = False 
-        self.filter_map['all'] = filter_all_map
-
-
-    def plot_filter_map(self):
-        n_px = self.consts['number_of_pixels']
-        r_left = self.consts['regions']['left']
-        r_right = self.consts['regions']['right']
-        region = np.zeros((n_px[0], n_px[1]), dtype=int)
-        region[r_left[0][0]:r_left[0][1], r_left[1][0]:r_left[1][1]] = 1
-        region[r_right[0][0]:r_right[0][1], r_right[1][0]:r_right[1][1]] = -1
-        print('Two spots location:')
-        plt.imshow(region)
-        # plt.savefig('testdir/simulation/spot.png')
-        plt.show()
-        for key in self.filter_map:
-            print('Filter for:', key)
-            plt.imshow(self.filter_map[key])
-            plt.grid()
-            # plt.savefig('testdir/simulation/' + key + '.png')
-            plt.show()
-    
-    def __init__(self, consts, nearby_radius=2):
-        self.consts = consts
-        self.initialize_self_filter_map()
-        self.initialize_cross_filter_map()
-        self.initialize_nearby_filter_map()
-        self.initialize_all_map()
 # %%

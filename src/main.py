@@ -1,102 +1,117 @@
-# %%
-# main function for two rings metasurface HOM Scan
-# using ccmodel_v2
+
+#%%
 import sys
-import ccmodel_v2 as ccmodel
+sys.path.append('..')
+
+import ccmodel
 
 import os 
 import pandas as pd
-import importlib
 import time
 import numpy as np
 import re
-from dotenv import load_dotenv
-dir_path = os.path.dirname(__file__)
-load_dotenv(os.path.join(dir_path, '.env'), override=True)
+import matplotlib.pyplot as plt
+import json
 
-try:
-    importlib.reload(ccmodel)   
-except:
-    print('CCmodel have not been imported')
+consts = {
+    'number_of_pixels' : 32,
+    'regions' : {
+        'left' : {
+            'up' : 8,
+            'bottom' : 26,
+            'left' : 4,
+            'right' : 14,
+        }, 
+        'right' : {
+            'up' : 8,
+            'bottom' : 26,
+            'left' : 17,
+            'right' : 27,
+        }
+    },
+    'coincidence_window' : 2,
+    'jitter_path' : r'C:\Users\stnav\OneDrive - HKUST Connect\Academics\Jensen Lab\Python codes\ccmodel_v3\common\_20200926_JitterCali_DropBadPixel.csv',
+    'working_directory' : r'E:\Data\JensenLab\test',
+    'write_directory' : r'E:\Data\JensenLab\test\analysis',
+    'modes' : {
+        'pixel_accumulated_count' : True,
+        'time_accumulated_count' : True,
+        'pixel_coincidence_count' : True,
+        'time_coincidence_count' : True,
+    },
+    'filters' : ['create_cross_filter', 'create_bright_filter'],
+    'threshold' : 0.75,
+    # 'image_model' : r'E:\Data\JensenLab\test\analysis\data_pixel_accumulated_count\2690816_Frame5_Exp250_iter1.csv'
+}     
 
-def backend(query):
-    consts = dict()
-    modes = dict()
+start_time = time.time()
 
-    ### CONSTS CONFIG - file and directory configuration
+ld = os.listdir(path=consts['working_directory'])
+files = set()
+paths = list()
+times = np.array([])
 
-    consts['number_of_pixels'] = (32, 32)
-    consts['regions'] = {
-        'left' : ((query['regions']['left'][0][0], query['regions']['left'][0][1]), (query['regions']['left'][1][0], query['regions']['left'][1][1])),
-        'right' : ((query['regions']['right'][0][0], query['regions']['right'][0][1]), (query['regions']['right'][1][0], query['regions']['right'][1][1])),
-        'all': ((query['regions']['all'][0][0], query['regions']['all'][0][1]), (query['regions']['all'][1][0], query['regions']['all'][1][1])),
-    }
-    consts['number_of_frames'] = query['number_of_frames']
-    consts['jitter_path'] = query['jitter_path']
-    consts['working_directory'] = query['working_directory']
-    consts['write_directory'] = os.path.join(consts['working_directory'], 'analysis')
-    consts['coincidence_window'] = query['coincidence_window']
+for file in ld:
+    match = re.match(r'(.+)\.(txt|npy|npz)$', file)
+    if match is None: continue
+    file = match[1]
+    files.add(file)
 
-    ###
+files = list(files)
 
-    ### MODES CONFIG - modes[var] = True to set auto initailization
+for file in files:
+    for ext in ('.npz', '.npy', '.txt'):
+        if file + ext in ld:
+            break
+    path = os.path.join(consts['working_directory'], file+ext) 
+    paths.append(path)
 
-    modes['pixel_accumulated_count'] = query['modes']['pixel_accumulated_count']
-    modes['time_accumulated_count'] = query['modes']['time_accumulated_count']
-    modes['pixel_coincidence_count'] = query['modes']['pixel_coincidence_count']
-    modes['time_coincidence_count'] = query['modes']['time_coincidence_count']
+# prepare filter
+filter = ccmodel.filter(consts)
 
-    ###
+if 'image_model' not in consts:
+    tb = ccmodel.time_bin(paths[0], consts, filter.create_base_filter(), debug=False, init_only=True)
+    tb.initialize_pixel_accumulated_count()
+    tb.write_to_file()
+    tb.save_figures()
+    consts['image_model'] = consts['write_directory'] + '/data_pixel_accumulated_count/' + os.path.basename(paths[0]).split('.')[0] + '.csv'
 
-    print('Working Directory at: {}'.format(consts['working_directory']))
-    filt_dict = dict()
-    filters =  ccmodel.filter_generator(consts)
-    filt = filters.filter_map[query['filter_map']]
+custom_filter = filter.create_base_filter() 
+for f in consts['filters']:
+    custom_filter = custom_filter & getattr(filter, f)()
+    
+fig = plt.figure(figsize=(8, 6))
+plt.imshow(filter.get_bright_image_model())
+plt.savefig(os.path.join(consts['write_directory'], 'filtered.png'))
+filter.plot_filter()
 
-    ld = sorted(os.listdir(path=consts['working_directory']))
-    files = set()
-    times = np.array([])
+# record config
+os.makedirs(consts['write_directory'], exist_ok=True)
+with open(os.path.join(consts['write_directory'], 'config.json'), 'w') as f:
+    json.dump(consts, f, indent=2)
 
-    for file in ld:
-        match = re.match(r'(.+)\.(txt|npy|npz)$', file)
-        if match is None: continue
-        file = match[1]
-        files.add(file)
+for i in range(len(paths)):
+    start_iter_time = time.time()
 
-    files = list(files)
+    print(str(i+1) + '/' + str(len(files)), files[i], end=' ')
 
-    start_time = time.time()
+    tb = ccmodel.time_bin(paths[i], consts, custom_filter)
+    tb.write_to_file()
+    tb.save_figures()
 
-    for i in range(len(files)):
-        start_iter_time = time.time()
+    end_iter_time = time.time()
+    iter_time = end_iter_time - start_iter_time
+    print('t=' + '%.2f' % iter_time + 's', end=' ')
+    times = np.append(times, iter_time)
+    elapsed_time = times.sum()
+    estimated_total_time = np.average(times)*len(files)
+    estimated_time_left = estimated_total_time - elapsed_time
+    print('etc=' + '%d' % (estimated_time_left//60) +'m' + '%d' % (estimated_time_left % 60) + 's', end='\n')
 
-        print(str(i+1) + '/' + str(len(files)), files[i], end=' ')
-
-        try:
-            ### MAIN CONFIG
-            tb = ccmodel.time_bins(files[i], consts, modes, filt, debug=False)
-            # tb.adjusted_bins[:, 24, 16] = 0
-            # tb.initialize_pixel_accumulated_count()
-            # tb.initialize_time_accumulated_count()
-            # tb.initialize_coincidence_count(pixel_mode=True, time_mode=True)
-            ###
-        except Exception as e:
-            print(f'\n{str(e).upper()}\nTERMINATING PROGRAM')
-            return
-
-        tb.write_to_file()
-        tb.save_figures()
-
-        end_iter_time = time.time()
-        iter_time = end_iter_time - start_iter_time
-        print('t=' + '%.2f' % iter_time + 's', end=' ')
-        times = np.append(times, iter_time)
-        elapsed_time = times.sum()
-        estimated_total_time = np.average(times)*len(files)
-        estimated_time_left = estimated_total_time - elapsed_time
-        print('etc=' + '%d' % (estimated_time_left//60) +'m' + '%d' % (estimated_time_left % 60) + 's', end='\n')
-
-    end_time = time.time()
-    print('Total Elapsed Time:', '%d' % ((end_time-start_time)//60) +'m' + '%d' % ((end_time-start_time) % 60) + 's')
+end_time = time.time()
+print('Total Elapsed Time:', '%d' % ((end_time-start_time)//60) +'m' + '%d' % ((end_time-start_time) % 60) + 's')
 
 
+# %%
+
+# %%
