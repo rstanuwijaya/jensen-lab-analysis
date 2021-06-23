@@ -24,7 +24,7 @@ from . import filter
 class time_bin:
     path = None
     name = None
-    consts = None
+    config = None
     ext = None
     modes = None
     filter = None
@@ -46,9 +46,9 @@ class time_bin:
             raise(exc)
 
     def initialize_jitter_bins(self):
-        n_px = self.consts['number_of_pixels']
+        n_px = self.config['number_of_pixels']
         if self.debug: print(self.name, 'Initializing jitter bins')
-        jitter_path = self.consts['jitter_path']
+        jitter_path = self.config['jitter_path']
         try:
             self.jitter_bins = pd.read_csv(jitter_path)["Jitter"].to_numpy().round().astype(int).reshape(n_px,n_px)
         except Exception as exc:
@@ -82,12 +82,12 @@ class time_bin:
         except:
             print('Failed to plot image accumulated count')
             raise
-        region = self.consts['regions']
+        region = self.config['regions']
         for key in region.keys():
             rect = patches.Rectangle((region[key]['left']-0.5, region[key]['up']-0.6), region[key]['right']-region[key]['left'], region[key]['bottom']-region[key]['up'], linewidth=1, edgecolor='red', facecolor='none')
             axs.add_patch(rect)
-        axs.set_xticks(range(0, self.consts['number_of_pixels'],4))
-        axs.set_yticks(range(0, self.consts['number_of_pixels'],4))
+        axs.set_xticks(range(0, self.config['number_of_pixels'],4))
+        axs.set_yticks(range(0, self.config['number_of_pixels'],4))
         axs.set_title(self.name + '\nPixel accumulated count')
         axs.grid()
         return axs, img
@@ -112,12 +112,12 @@ class time_bin:
     
     def initialize_coincidence_count(self, pixel_mode=False, time_mode=False):
         if self.debug: print(self.name, 'Initializing pixel and time coincidence_count')
-        n_px = self.consts['number_of_pixels']
+        n_px = self.config['number_of_pixels']
         height = n_px
         width = n_px
         num_px = height * width
         adjusted_bins = self.adjusted_bins
-        cw = self.consts['coincidence_window']
+        cw = self.config['coincidence_window']
         max_tb = 1024
         F = self.filter
         if pixel_mode: pixel_coincidence_count = np.zeros(num_px, dtype=int)
@@ -152,8 +152,8 @@ class time_bin:
         if self.pixel_coincidence_count is None: return
         if axs == None: axs = plt.axes()
         img = axs.imshow(self.pixel_coincidence_count, cmap=self.cmap)
-        axs.set_xticks(range(0, self.consts['number_of_pixels'],4))
-        axs.set_yticks(range(0, self.consts['number_of_pixels'],4))
+        axs.set_xticks(range(0, self.config['number_of_pixels'],4))
+        axs.set_yticks(range(0, self.config['number_of_pixels'],4))
         axs.grid()
         axs.set_title(self.name + '\nPixel coincidence count')
         return axs, img
@@ -181,7 +181,7 @@ class time_bin:
         saves all counts to the writing directory.
         '''
         if self.debug: print(self.name, 'Writing to file')
-        write_directory = self.consts['write_directory']
+        write_directory = self.config['write_directory']
         
         os.makedirs(write_directory, exist_ok=True)
 
@@ -201,7 +201,7 @@ class time_bin:
         generates all figures and save it to the writing directory.
         '''
         if self.debug: print(self.name, 'Saving Figures')
-        write_directory = self.consts['write_directory']
+        write_directory = self.config['write_directory']
 
         os.makedirs(write_directory, exist_ok=True)
 
@@ -223,36 +223,36 @@ class time_bin:
         plot('plot_pixel_coincidence_count', self.plot_pixel_coincidence_count, self.pixel_coincidence_count, cbar=True)
         plot('plot_time_coincidence_count', self.plot_time_coincidence_count, self.time_coincidence_count, cbar=False)
 
-    def __init__(self, path, consts, filter, debug=False, init_only=False):
+    def __init__(self, path, config, filter, debug=False, init_only=False):
         '''
-        param: name, consts
+        param: name, config
         initialize the parameters of the model.
 
         ------
         name: str, name of the file
-        consts: dict, dictionary containing the constants
+        config: dict, dictionary containing the constants
         '''
         # pack constructor parameters
         self.path = path
         self.name , self.ext = os.path.splitext(os.path.basename(path))
-        self.consts = consts
+        self.config = config
         self.debug = debug
         self.filter = filter
 
         # set working directory
-        os.chdir(self.consts['working_directory'])
+        os.chdir(self.config['working_directory'])
         
         # basic parameter initialization
         self.initialize_raw_bins()
         self.initialize_jitter_bins()
         self.initialize_adjusted_bins()
         if not init_only:
-            if self.consts['modes']['pixel_accumulated_count']: 
+            if self.config['modes']['pixel_accumulated_count']: 
                 self.initialize_pixel_accumulated_count()
-            if self.consts['modes']['time_accumulated_count']:    
+            if self.config['modes']['time_accumulated_count']:    
                 self.initialize_time_accumulated_count()
-            if self.consts['modes']['pixel_coincidence_count'] or self.consts['modes']['time_coincidence_count']:    
-                self.initialize_coincidence_count(self.consts['modes']['pixel_coincidence_count'], self.consts['modes']['time_coincidence_count'])
+            if self.config['modes']['pixel_coincidence_count'] or self.config['modes']['time_coincidence_count']:    
+                self.initialize_coincidence_count(self.config['modes']['pixel_coincidence_count'], self.config['modes']['time_coincidence_count'])
 
     def __str__(self):
         self.plot_pixel_accumulated_count()

@@ -12,10 +12,10 @@ class filter:
     filter_heatmap = None
     filter_type = None
     filter_map = dict()
-    consts = None
+    config = None
 
     def select_blank(self) -> np.ndarray:
-        n_px = self.consts['number_of_pixels']
+        n_px = self.config['number_of_pixels']
         blank_image: np.ndarray = np.zeros((n_px, n_px), dtype=bool)
         return blank_image
 
@@ -23,29 +23,29 @@ class filter:
         return input.reshape(1, -1)
     
     def load_image_model(self) -> np.ndarray:
-        image_model_path = self.consts.get('image_model', '')   
+        image_model_path = self.config.get('image_model', '')   
         return np.loadtxt(image_model_path)
 
     def select_bright(self) -> np.ndarray:
-        threshold = self.consts.get('threshold', 0)
+        threshold = self.config.get('threshold', 0)
         image_model = self.load_image_model()
         image_bright =  image_model > (threshold * np.max(image_model))
         return image_bright
 
     def select_left(self) -> np.ndarray:
-        r_left = self.consts['regions']['left']
+        r_left = self.config['regions']['left']
         image_left = self.select_region(
             up=r_left['up'], bottom=r_left['bottom'], left=r_left['left'], right=r_left['right'])
         return image_left
     
     def select_right(self) -> np.ndarray:
-        r_right = self.consts['regions']['right']
+        r_right = self.config['regions']['right']
         image_right = self.select_region(
             up=r_right['up'], bottom=r_right['bottom'], left=r_right['left'], right=r_right['right'])
         return image_right
 
     def select_region(self, up: int = -1, bottom: int = -1, left: int = -1, right: int = -1) -> np.ndarray:
-        n_px = self.consts['number_of_pixels']
+        n_px = self.config['number_of_pixels']
         blank_image = self.select_blank()
 
         up = up if up != -1 else 1
@@ -57,7 +57,7 @@ class filter:
         return blank_image
 
     def create_base_filter(self) -> np.ndarray:
-        n_px = self.consts['number_of_pixels']
+        n_px = self.config['number_of_pixels']
         image_left = self.select_left()
         image_right = self.select_right()
 
@@ -103,7 +103,7 @@ class filter:
         return cross_filter
 
     def create_nearby_filter(self, radius=1) -> np.ndarray:
-        n_px = self.consts['number_of_pixels']
+        n_px = self.config['number_of_pixels']
         base_filter = self.create_base_filter()
         nearby_filter = np.zeros((n_px*n_px, n_px*n_px), dtype=bool)
 
@@ -140,7 +140,7 @@ class filter:
         return image_model
 
     def plot_spots(self):
-        n_px = self.consts['number_of_pixels']
+        n_px = self.config['number_of_pixels']
         print('Two spots location:')
         region = np.zeros((n_px, n_px))
         region[self.select_left()] = 1
@@ -157,6 +157,6 @@ class filter:
         except:
             print('Failed to get bright pixels')
 
-    def __init__(self, consts:dict):
-        self.consts = consts
+    def __init__(self, config:dict):
+        self.config = config
 # %%
