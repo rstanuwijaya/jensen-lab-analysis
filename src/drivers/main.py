@@ -1,6 +1,7 @@
 
 #%%
 import sys
+sys.path.append('.')
 sys.path.append('..')
 
 import ccmodel
@@ -31,16 +32,16 @@ config = {
     },
     'coincidence_window' : 2,
     'jitter_path' : r'C:\Users\stnav\OneDrive - HKUST Connect\Academics\Jensen Lab\Python codes\ccmodel_v3\common\_20200926_JitterCali_DropBadPixel.csv',
-    'working_directory' : r'E:\Data\JensenLab\test',
-    'write_directory' : r'E:\Data\JensenLab\test\analysis',
+    'working_directory' : r'E:\Data\JensenLab\FineScan_Aligned_1.2MCount10sPerPixel_5usFrame12x12SpotSize',
+    'write_directory' : r'E:\Data\JensenLab\FineScan_Aligned_1.2MCount10sPerPixel_5usFrame12x12SpotSize\analysis_cross_unnorm',
     'modes' : {
         'pixel_accumulated_count' : True,
         'time_accumulated_count' : True,
-        'pixel_coincidence_count' : True,
-        'time_coincidence_count' : True,
+        'pixel_coincidence_count' : False,
+        'time_coincidence_count' : False,
     },
     'filters' : ['create_cross_filter', 'create_bright_filter'],
-    'threshold' : 0.75,
+    'threshold' : 0.2,
     # 'image_model' : r'E:\Data\JensenLab\test\analysis\data_pixel_accumulated_count\2690816_Frame5_Exp250_iter1.csv'
 }     
 
@@ -63,7 +64,7 @@ for file in files:
     for ext in ('.npz', '.npy', '.txt'):
         if file + ext in ld:
             break
-    path = os.path.join(config['working_directory'], file+ext) 
+    path = os.path.join(os.path.abspath(config['working_directory']), file+ext) 
     paths.append(path)
 
 # prepare filter
@@ -83,7 +84,8 @@ for f in config['filters']:
 fig = plt.figure(figsize=(8, 6))
 plt.imshow(filter.get_bright_image_model())
 plt.savefig(os.path.join(config['write_directory'], 'filtered.png'))
-filter.plot_filter()
+plt.close()
+# filter.plot_filter()
 
 # record config
 os.makedirs(config['write_directory'], exist_ok=True)
@@ -110,3 +112,9 @@ for i in range(len(paths)):
 
 end_time = time.time()
 print('Total Elapsed Time:', '%d' % ((end_time-start_time)//60) +'m' + '%d' % ((end_time-start_time) % 60) + 's')
+
+delay_cc = ccmodel.analysis.cc_vs_delay(config['write_directory'] + '/data_time_coincidence_count', config['coincidence_window'])
+plt.scatter(*delay_cc)
+plt.savefig(config['write_directory'] + '/delay_cc.png')
+plt.close()
+# %%

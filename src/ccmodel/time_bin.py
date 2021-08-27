@@ -2,7 +2,7 @@
 '''
 About ccmodel:
 
-v2: refactored signifacnt amount of code for optimization.
+v3: refactored signifacnt amount of code for optimization.
 
 Analysis tool for the data produced by pf32 camera - picosecond time resolved 32-by-32 pixels camera.
 '''
@@ -65,7 +65,7 @@ class time_bin:
 
     def initialize_pixel_accumulated_count(self):
         if self.debug: print(self.name, 'Initializing pixel_accumulated_count')
-        self.pixel_accumulated_count = self.adjusted_bins.sum(0)
+        self.pixel_accumulated_count = np.count_nonzero(self.adjusted_bins, axis=0)
 
     def plot_pixel_accumulated_count(self, axs=None):
         '''
@@ -94,7 +94,7 @@ class time_bin:
 
     def initialize_time_accumulated_count(self):
         if self.debug: print(self.name, 'Initializing time_accumulated_count')
-        self.time_accumulated_count = np.histogram(self.adjusted_bins, bins=1024, range=(0,1024))[0]
+        self.time_accumulated_count = histogram1d(self.adjusted_bins, bins=1024, range=(0,1024))
 
     def plot_time_accumulated_count(self, axs=None):
         '''
