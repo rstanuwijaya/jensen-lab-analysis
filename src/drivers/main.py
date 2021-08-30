@@ -18,27 +18,27 @@ config = {
     'number_of_pixels' : 32,
     'regions' : {
         'left' : {
-            'up' : 8,
-            'bottom' : 26,
-            'left' : 4,
-            'right' : 14,
+            'up' : 12,
+            'bottom' : 16,
+            'left' : 9,
+            'right' : 13,
         }, 
         'right' : {
-            'up' : 8,
-            'bottom' : 26,
+            'up' : 12,
+            'bottom' : 16,
             'left' : 17,
-            'right' : 27,
+            'right' : 21,
         }
     },
     'coincidence_window' : 2,
     'jitter_path' : r'C:\Users\stnav\OneDrive - HKUST Connect\Academics\Jensen Lab\Python codes\ccmodel_v3\common\_20200926_JitterCali_DropBadPixel.csv',
-    'working_directory' : r'E:\Data\JensenLab\FineScan_Aligned_1.2MCount10sPerPixel_5usFrame12x12SpotSize',
-    'write_directory' : r'E:\Data\JensenLab\FineScan_Aligned_1.2MCount10sPerPixel_5usFrame12x12SpotSize\analysis_cross_unnorm',
+    'working_directory' : r'E:\Data\JensenLab\VarySyncFine',
+    'write_directory' : r'E:\Data\JensenLab\VarySyncFine\analysis',
     'modes' : {
         'pixel_accumulated_count' : True,
         'time_accumulated_count' : True,
         'pixel_coincidence_count' : False,
-        'time_coincidence_count' : False,
+        'time_coincidence_count' : True,
     },
     'filters' : ['create_cross_filter', 'create_bright_filter'],
     'threshold' : 0.2,
@@ -58,7 +58,7 @@ for file in ld:
     file = match[1]
     files.add(file)
 
-files = list(files)
+files = sorted(list(files))
 
 for file in files:
     for ext in ('.npz', '.npy', '.txt'):
