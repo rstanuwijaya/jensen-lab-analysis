@@ -63,10 +63,6 @@ class FitModel:
             alias = 2
 
             for i in range(-alias, alias+1):
-                if i not in (0,):
-                    continue
-                # if i not in (-1, 1): continue
-                # if i not in (-2, 2): continue
                 result += (-1 * is_even(i)) * (erf(tau + i*Z, tcc,
                                                 k_, delta_T) - erf(tau + i*Z, -tcc, k_, delta_T))
 
