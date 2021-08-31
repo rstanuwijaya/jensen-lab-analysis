@@ -16,7 +16,7 @@ debug = False
 
 
 def ver():
-    print('v1')
+    print('v2')
 
 
 class FitModel:
@@ -27,17 +27,8 @@ class FitModel:
         self.fitradius = fitradius
         self.init_params = init_params
 
-    # def model(self, iter_params):
-    #     N = iter_params['N'] if iter_params['N'] is not None else self.init_params['N'][0]
-    #     m = iter_params['m'] if iter_params['m'] is not None else self.init_params['m'][0]
-    #     delta_T = iter_params['delta_T'] if iter_params['delta_T'] is not None else self.init_params['delta_T'][0]
-    #     tw = iter_params['tw'] if iter_params['tw'] is not None else self.init_params['tw'][0]
-    #     tau0 = iter_params['tau0'] if iter_params['tau0'] is not None else self.init_params['tau0'][0]
-    #     A = iter_params['A'] if iter_params['A'] is not None else self.init_params['A'][0]
-    #     b = iter_params['b'] if iter_params['b'] is not None else self.init_params['b'][0]
-    #     tsink = iter_params['tsink'] if iter_params['tsink'] is not None else self.init_params['tsink'][0]
-
     def model(self, x, N, m, delta_T, tw, tau0, A, b, Z):
+        N = int(N)
         P = {tau: 0 for tau in range(-N, N+1)}
 
         def calculate_P_nonzero(k):
@@ -61,8 +52,8 @@ class FitModel:
             return a if a > 0 else 0
 
         def erf(tau_, tcc_, k_, delta_T):
-            # return math.erf((tcc_ + 2*(tau_ + k_*delta_T)) / (math.sqrt(2)*tw/math.sqrt(math.log(2))))
-            return math.atan((2*(tau_ + k_*delta_T) + tcc_) / (2*tw))
+            # return math.erf((tcc_ + 2*(tau_ + k_*delta_T)) / (math.sqrt(2)*tw/math.sqrt(math.log(2)))) # use gaussian distribution
+            return math.atan((2*(tau_ + k_*delta_T) + tcc_) / (2*tw)) # use lorentzian distribution
 
         def is_even(x):
             return 1 if x % 2 == 0 else -1
@@ -104,7 +95,7 @@ class FitModel:
         self.total_prob_all = total_prob_all
         self.params = (m, delta_T, tw, tau0, eta, A, b)
 
-        return total_prob_all
+        return list(total_prob_all.values())
 
     def plot_model_sep(self, lim=None):
         if lim is None:
