@@ -66,7 +66,8 @@ class RunFit:
     def run_fit(self):
         result = self.model.fit(self.ydata, self.params, x=self.xdata)
         print(result.fit_report())
-        result.plot_fit()
+        plt.figure(figsize=(20,30))
+        result.plot_fit(datafmt=',')
         plt.show()
         return result
 
@@ -76,45 +77,48 @@ fpaths = [os.path.join(dirpath, fname) for fname in os.listdir(dirpath)]
 fpaths = reversed(sorted(fpaths))
 model_result = None
 for fpath in fpaths:
-    freq = os.path.basename(fpath).split('_')[0].replace('Freq', '')
-    # if freq not in ('19940', '19920', '19960'): continue
-    var['CameraPeriod'] = 1/(int(freq)*1e3)
+    CameraFreq = os.path.basename(fpath).split('_')[0].replace('Freq', '')
+    CameraFreq = int(CameraFreq)
+    # if CameraFreq % 100 != 0: continue
+    if CameraFreq != 19600: continue
+    var['CameraPeriod'] = 1/(CameraFreq*1e3)
     init_params = {
         'N': {
             'value': consts['FrameTime']/var['CameraPeriod'],
             'vary': False,
         },
         'm': {
-            'value': 1.3,
+            'value': 1.443,
             'vary': True,
         },
         'delta_T': {
             'value': (var['CameraPeriod']-consts['LaserPeriod'])/consts['TimeBinLength'],
-            'vary' : False,
+            'vary' : True,
         },
         'tw': {
-            'value': 8,
-            'vary': False,
+            'value': 13,
+            'vary': True,
         },
         'tau0': {
             'value': 0,
             'vary': False,
         },
         'A': {
-            'value': 169,
+            'value': 229,
             'vary': True,
         },
         'b': {
-            'value': 11,
+            'value': 5,
             'vary': True,
         },
         'Z': {
             'value': 1024*var['CameraPeriod']/55e-9,
-            'vary': False,
+            'vary': True,
         },
     }
     if model_result:
         init_params['m']['value'] = model_result.params['m'].value
+        init_params['tw']['value'] = model_result.params['tw'].value
         init_params['A']['value'] = model_result.params['A'].value
         init_params['b']['value'] = model_result.params['b'].value
     

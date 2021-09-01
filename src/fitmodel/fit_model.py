@@ -8,7 +8,6 @@ import time
 # constants
 n_tb = 1024
 # N = frame time / camera freq (20MHz)
-tbsize = 56
 tcc = 4
 # eta = 0.003
 eta = 2e6/128/50000/100/1024
@@ -52,8 +51,8 @@ class FitModel:
             return a if a > 0 else 0
 
         def erf(tau_, tcc_, k_, delta_T):
-            # return math.erf((tcc_ + 2*(tau_ + k_*delta_T)) / (math.sqrt(2)*tw/math.sqrt(math.log(2)))) # use gaussian distribution
-            return math.atan((2*(tau_ + k_*delta_T) + tcc_) / (2*tw)) # use lorentzian distribution
+            return math.erf((tcc_ + 2*(tau_ + k_*delta_T)) / (math.sqrt(2)*tw/math.sqrt(math.log(2)))) # use gaussian distribution
+            # return math.atan((2*(tau_ + k_*delta_T) + tcc_) / (2*tw)) # use lorentzian distribution
 
         def is_even(x):
             return 1 if x % 2 == 0 else -1
@@ -63,6 +62,7 @@ class FitModel:
             alias = 2
 
             for i in range(-alias, alias+1):
+                # if i in (0, ): continue
                 result += (-1 * is_even(i)) * (erf(tau + i*Z, tcc,
                                                 k_, delta_T) - erf(tau + i*Z, -tcc, k_, delta_T))
 
