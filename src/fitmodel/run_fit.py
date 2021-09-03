@@ -23,15 +23,16 @@ var = {
 }
 
 config = {
-    'FitRadius': 1024,
+    'FitRadius': (-1024, 1024),
 }
 
 class RunFit:
-    def __init__(self, init_params: dict, fpath: bool, fitradius: int = 1024, test_fit: bool = True, debug: bool = True):
+    def __init__(self, init_params: dict, fpath: bool, fitradius: tuple = (-1024, 1024), test_fit: bool = True, debug: bool = True):
         self.init_params = init_params
         self.fpath = fpath
         self.fname = os.path.basename(fpath)
-        self.fitradius = fitradius
+        self.min_x = fitradius[0]
+        self.max_x = fitradius[1]
         self.test_fit = test_fit
         self.debug = debug
         self.iter = 1
@@ -43,9 +44,9 @@ class RunFit:
         full_xdata = [x for x in range(-n_tb, n_tb+1)]
         full_ydata = np.loadtxt(self.fpath)
         full_data = zip(full_xdata, full_ydata)
-        self.xdata = [x for x in range(-self.fitradius, self.fitradius+1)]
+        self.xdata = [x for x in range(self.min_x, self.max_x+1)]
         self.ydata = [y for x, y in full_data if x in self.xdata]
-        self.fitmodel = FitModel(self.xdata, self.ydata, self.fitradius, self.init_params, self.fname)
+        self.fitmodel = FitModel(self.xdata, self.ydata, (self.min_x, self.max_x), self.init_params, self.fname)
     
     def init_fit(self):
         self.model = lmfit.Model(self.fitmodel.model, name=self.fname)
@@ -64,23 +65,36 @@ class RunFit:
         return result
     
     def run_fit(self):
-        result = self.model.fit(self.ydata, self.params, x=self.xdata)
-        print(result.fit_report())
+        self.result = self.model.fit(self.ydata, self.params, x=self.xdata)
+        print(self.result.fit_report())
         plt.figure(figsize=(20,30))
-        result.plot_fit(datafmt=',')
+        self.result.plot_fit(datafmt='o')
         plt.show()
-        return result
+        self.fit_params = self.result.params
+        return self.result
+
+    def save_fit(self, savedirpath=''):
+        data = np.array([self.ydata, self.result.best_fit]).transpose()
+        savepath = os.path.join(savedirpath, self.fname)
+        print('savepath', savepath)
+        np.savetxt(savepath, data)
+
+        report = self.result.fit_report()
+        with open(savepath.replace('.csv', '_report.txt'), 'w') as fh:
+            fh.write(report)
+
 
 # test = RunFit(init_params, fpath, fitradius=900)
 dirpath = '/mnt/e/Data/JensenLab/VarySyncFine/analysis/data_time_coincidence_count'
 fpaths = [os.path.join(dirpath, fname) for fname in os.listdir(dirpath)]
-fpaths = reversed(sorted(fpaths))
+fpaths = (sorted(fpaths))
 model_result = None
 for fpath in fpaths:
     CameraFreq = os.path.basename(fpath).split('_')[0].replace('Freq', '')
     CameraFreq = int(CameraFreq)
     # if CameraFreq % 100 != 0: continue
-    if CameraFreq != 19600: continue
+    if CameraFreq not in (19780, 19880, 19980): continue
+    # if CameraFreq != 19960: continue
     var['CameraPeriod'] = 1/(CameraFreq*1e3)
     init_params = {
         'N': {
@@ -88,15 +102,16 @@ for fpath in fpaths:
             'vary': False,
         },
         'm': {
-            'value': 1.443,
+            'value': 1.2899,
             'vary': True,
         },
         'delta_T': {
             'value': (var['CameraPeriod']-consts['LaserPeriod'])/consts['TimeBinLength'],
+            # 'value': 23.2771,
             'vary' : True,
         },
         'tw': {
-            'value': 13,
+            'value': 13.095,
             'vary': True,
         },
         'tau0': {
@@ -104,16 +119,17 @@ for fpath in fpaths:
             'vary': False,
         },
         'A': {
-            'value': 229,
+            'value': 326.44,
             'vary': True,
         },
         'b': {
-            'value': 5,
+            'value': 0,
             'vary': True,
         },
         'Z': {
             'value': 1024*var['CameraPeriod']/55e-9,
-            'vary': True,
+            # 'value': 964.70,
+            'vary': False,
         },
     }
     if model_result:
@@ -124,4 +140,5 @@ for fpath in fpaths:
     
     model = RunFit(init_params, fpath, fitradius=config['FitRadius'])
     model_result = model.run_fit()
+    model.save_fit('/mnt/e/Data/JensenLab/VarySyncFine/analysis/data_fittingmodel')
 # %%

@@ -23,7 +23,8 @@ class FitModel:
         self.name = name
         self.xdata = xdata
         self.ydata = ydata
-        self.fitradius = fitradius
+        self.min_x = fitradius[0]
+        self.max_x = fitradius[1]
         self.init_params = init_params
 
     def model(self, x, N, m, delta_T, tw, tau0, A, b, Z):
@@ -45,7 +46,7 @@ class FitModel:
             else:
                 P[k] = calculate_P_nonzero(k)
 
-        def prob(tau_):
+        def prob(tau_): # f(tau)
             # return 1
             a = (Z-abs(tau_))/n_tb
             return a if a > 0 else 0
@@ -57,16 +58,19 @@ class FitModel:
         def is_even(x):
             return 1 if x % 2 == 0 else -1
 
+        def func_g(tau, delta_T, k_):
+            result = (erf(tau, tcc, k_, delta_T) - erf(tau, -tcc, k_, delta_T))
+            return abs(result)
+
         def terms(tau, delta_T, k_):
             result = 0
-            alias = 2
-
-            for i in range(-alias, alias+1):
-                # if i in (0, ): continue
-                result += (-1 * is_even(i)) * (erf(tau + i*Z, tcc,
-                                                k_, delta_T) - erf(tau + i*Z, -tcc, k_, delta_T))
-
-            return abs(result)
+            alias = 1
+            total_g = np.sum([func_g(tau + i*Z, delta_T, k_) for i in range(-alias, alias+1)])
+            if total_g == 0: return 0
+            result += func_g(tau - Z, delta_T, k_)**2 / total_g
+            result += func_g(tau, delta_T, k_)**2 / total_g
+            result += func_g(tau + Z, delta_T, k_)**2 / total_g
+            return result
 
         def calculate_total_prob_cc(tau, delta_T):
             return A * prob(tau) * P[0] * terms(tau, delta_T, 0)
@@ -75,16 +79,16 @@ class FitModel:
             return A * prob(tau) * np.sum([(P[k] * terms(tau, delta_T, k)) for k in range(-(N-1), (N-1)+1) if k != 0])
 
         def calculate_total_prob_noise(tau, delta_T):
-            return A * b * prob(tau)
+            return A * prob(tau) * b
 
         total_prob_cc = {tau: calculate_total_prob_cc(
-            tau, delta_T) for tau in range(-self.fitradius, self.fitradius+1)}
+            tau, delta_T) for tau in range(self.min_x, self.max_x+1)}
         total_prob_ac = {tau: calculate_total_prob_ac(
-            tau, delta_T) for tau in range(-self.fitradius, self.fitradius+1)}
+            tau, delta_T) for tau in range(self.min_x, self.max_x+1)}
         total_prob_noise = {tau: calculate_total_prob_noise(
-            tau, delta_T) for tau in range(-self.fitradius, self.fitradius+1)}
+            tau, delta_T) for tau in range(self.min_x, self.max_x+1)}
         total_prob_all = {
-            tau: total_prob_cc[tau]+total_prob_ac[tau]+total_prob_noise[tau] for tau in range(-self.fitradius, self.fitradius+1)}
+            tau: total_prob_cc[tau]+total_prob_ac[tau]+total_prob_noise[tau] for tau in range(self.min_x, self.max_x+1)}
         self.total_prob_cc = total_prob_cc
         self.total_prob_ac = total_prob_ac
         self.total_prob_noise = total_prob_noise
