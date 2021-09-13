@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import os
 import time
 
-print(__name__)
 from fitmodel import RunFit
 
 
@@ -36,7 +35,7 @@ for fpath in fpaths:
     CameraFreq = os.path.basename(fpath).split('_')[0].replace('Freq', '')
     CameraFreq = int(CameraFreq)
     # if CameraFreq % 100 != 0: continue
-    if CameraFreq not in (19780, 19880, 19980): continue
+    if CameraFreq not in (19580, ): continue
     # if CameraFreq != 19960: continue
     var['CameraPeriod'] = 1/(CameraFreq*1e3)
     init_params = {
@@ -50,7 +49,7 @@ for fpath in fpaths:
         },
         'delta_T': {
             'value': (var['CameraPeriod']-consts['LaserPeriod'])/consts['TimeBinLength'],
-            # 'value': 23.2771,
+            'value': 23.2771710 ,
             'vary' : False,
         },
         'tw': {
@@ -71,7 +70,7 @@ for fpath in fpaths:
         },
         'Z': {
             'value': 1024*var['CameraPeriod']/55e-9,
-            # 'value': 964.70,
+            'value': 964.702446 ,
             'vary': False,
         },
     }
@@ -83,4 +82,5 @@ for fpath in fpaths:
     
     model = RunFit(init_params, fpath, fitradius=config['FitRadius'])
     model_result = model.run_fit()
-    # model.save_fit('/mnt/e/Data/JensenLab/VarySyncFine/analysis/data_fittingmodel')
+    model.save_fit('/mnt/e/Data/JensenLab/VarySyncFine/analysis/data_fittingmodel')
+    # model.save_fit('/mnt/e/Data/JensenLab/VarySyncFine/analysis/data_fittingmodel', 'test_g1.csv')

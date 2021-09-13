@@ -10,7 +10,7 @@ import time
 import importlib
 import pandas
 
-from fit_model import *
+from .fit_model import *
 class RunFit:
     def __init__(self, init_params: dict, fpath: bool, fitradius: tuple = (-1024, 1024), test_fit: bool = True, debug: bool = True):
         self.init_params = init_params
@@ -58,12 +58,15 @@ class RunFit:
         self.fit_params = self.result.params
         return self.result
 
-    def save_fit(self, savedirpath=''):
+    def save_fit(self, savedirpath='', fname=''):
         data = np.array([self.ydata, self.result.best_fit]).transpose()
-        savepath = os.path.join(savedirpath, self.fname)
+        if fname == '':
+            savepath = os.path.join(savedirpath, self.fname)
+        else:
+            savepath = os.path.join(savedirpath, fname)
         print('savepath', savepath)
         np.savetxt(savepath, data)
 
-        report = self.result.fit_report()
+        report = self.result.fit_report() 
         with open(savepath.replace('.csv', '_report.txt'), 'w') as fh:
             fh.write(report)

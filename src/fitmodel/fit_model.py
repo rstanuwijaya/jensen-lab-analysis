@@ -66,11 +66,12 @@ class FitModel:
             result = 0
             alias = 1
             total_g = np.sum([func_g(tau + i*Z, delta_T, k_) for i in range(-alias, alias+1)])
-            if total_g == 0: return 0
-            result += func_g(tau - Z, delta_T, k_)**2 / total_g
-            result += func_g(tau, delta_T, k_)**2 / total_g
-            result += func_g(tau + Z, delta_T, k_)**2 / total_g
-            return result
+            # if total_g == 0: return 0
+            # result += func_g(tau - Z, delta_T, k_)*func_g(tau - Z, delta_T, k_) / total_g
+            # result += func_g(tau + 0, delta_T, k_)*func_g(tau + 0, delta_T, k_) / total_g
+            # result += func_g(tau + Z, delta_T, k_)*func_g(tau + Z, delta_T, k_) / total_g
+            # return result
+            return total_g
 
         def calculate_total_prob_cc(tau, delta_T):
             return A * prob(tau) * P[0] * terms(tau, delta_T, 0)
