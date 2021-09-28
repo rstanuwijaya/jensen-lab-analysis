@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from random import randint
-
+from cv2 import ximgproc
 class SlotModel:
     def __init__(self, canvas, x, y, r, width, height):
         self.canvas = canvas
@@ -16,29 +16,29 @@ class SlotModel:
     
     @property
     def image(self):
-        print("kontol")
         img = self.canvas * 0
         x, y, r, w, h = self.x, self.y, self.r, self.w, self.h 
         bl = x - w//2
         br = x + w//2
         bt = y - h//2
         bb = y + w//2
-        cv2.circle(img, (bl + r, bt + r), r, (0, 255, 0), -1)
-        cv2.circle(img, (br - r, bt + r), r, (0, 255, 0), -1)
-        cv2.circle(img, (bl + r, bb - r), r, (0, 255, 0), -1)
-        cv2.circle(img, (br - r, bb - r), r, (0, 255, 0), -1)
-        cv2.rectangle(img, (bl + r, bt), (br - r, bb), (0, 255, 0), -1)
-        cv2.rectangle(img, (bl, bt + r), (br, bb - r), (0, 255, 0), -1)
+        cv2.circle(img, (bl + r, bt + r), r, (255, 255, 255), -1)
+        cv2.circle(img, (br - r, bt + r), r, (255, 255, 255), -1)
+        cv2.circle(img, (bl + r, bb - r), r, (255, 255, 255), -1)
+        cv2.circle(img, (br - r, bb - r), r, (255, 255, 255), -1)
+        cv2.rectangle(img, (bl + r, bt), (br - r, bb), (255, 255, 255), -1)
+        cv2.rectangle(img, (bl, bt + r), (br, bb - r), (255, 255, 255), -1)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         return img
 
 class MetaAnalyzer:
     def __init__(self, path):
         self.__path = path
         self.__image = self.load_image(self.__path)
-        self.__contours = self.get_contours(self.__image)
+        # self.__contours = self.get_contours(self.__image)
         # self.__rectangles = self.draw_rectangles()
-        # self.test_model()
-        self.fit_ellipse()
+        self.test_model()
+
 
     @staticmethod
     def load_image(path):
@@ -66,11 +66,15 @@ class MetaAnalyzer:
     
     def test_model(self):
         img_gray = cv2.cvtColor(self.__image, cv2.COLOR_BGR2GRAY)
-        model = SlotModel(self.__image, 500, 500, 50, 400, 400)
-        slot = model.image
-        print(slot.shape)
+        model = SlotModel(self.__image, 500, 500, 200, 400, 800)
+        slot = model.image        
         res_img = self.__image*0
-        plt.imshow(slot)
+        ret, im = cv2.threshold(slot, 70, 256, cv2.THRESH_BINARY)
+        contours, hierarchy  = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in contours:
+            print(c.shape)
+            cv2.drawContours(res_img, c, -1, (0,randint(100,255),randint(100,255)),5)
+        plt.imshow(res_img)
         plt.show()
 
     def fit_ellipse(self):
