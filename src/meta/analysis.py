@@ -5,49 +5,52 @@ import numpy as np
 import matplotlib.pyplot as plt
 from random import randint
 from cv2 import ximgproc
+    
+
 class SlotModel:
     def __init__(self, canvas):
         self.canvas = canvas * 0 
-    
-    def single_slot(self, y, x, r, w, h):
-        img = self.canvas
+
+    @staticmethod
+    def single_slot(cell, y, x, l, w, r):
         bl = x - w//2
         br = x + w//2
-        bt = y - h//2
-        bb = y + w//2
-        cv2.circle(img, (bl + r, bt + r), r, (255, 255, 255), -1)
-        cv2.circle(img, (br - r, bt + r), r, (255, 255, 255), -1)
-        cv2.circle(img, (bl + r, bb - r), r, (255, 255, 255), -1)
-        cv2.circle(img, (br - r, bb - r), r, (255, 255, 255), -1)
-        cv2.rectangle(img, (bl + r, bt), (br - r, bb), (255, 255, 255), -1)
-        cv2.rectangle(img, (bl, bt + r), (br, bb - r), (255, 255, 255), -1)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        bt = y - l//2
+        bb = y + l//2
+        print(bl, br, bt, bb)
+        cv2.circle(cell, (bl + r, bt + r), r, 255, -1)
+        cv2.circle(cell, (br - r, bt + r), r, 255, -1)
+        cv2.circle(cell, (bl + r, bb - r), r, 255, -1)
+        cv2.circle(cell, (br - r, bb - r), r, 255, -1)
+        cv2.rectangle(cell, (bl + r, bt), (br - r, bb), 255, -1)
+        cv2.rectangle(cell, (bl, bt + r), (br, bb - r), 255, -1)
+        return cell
+
+    @staticmethod
+    def slot_cell(py, px, dx, dy, l, w, r):
+        img = np.zeros((py, px), np.uint8)
+        img = SlotModel.single_slot(img, py//2-dy, px//2+dx, l, w, r)
+        img = SlotModel.single_slot(img, py//2+dy, px//2-dx, l, w, r)
         return img
-    
-    def slot_function(self, y0, x0, dy, dx, theta, r, w, h):
-        canvas_h, canvas_w, _ = self.canvas.shape
-        n_x = canvas_h // dx + 3
-        n_y = canvas_w // dy + 3
-        locs_x1 = np.arange(n_x)*dx+x0 
-        locs_x2 = np.arange(n_x)*dx+x0+dx//2 
-        locs_y1 = np.arange(n_y)*dy+y0 
-        locs_y2 = np.arange(n_y)*dy+y0+dy//2 
-        img = cv2.cvtColor(self.canvas, cv2.COLOR_BGR2GRAY)
-        for i in locs_x1:
-            for j in locs_y1:
-                img += self.single_slot(i, j, r, w, h)
-        for i in locs_x2:
-            for j in locs_y2:
-                img += self.single_slot(i, j, r, w, h)
+
+    @staticmethod
+    def slot_lattice(data, y0, x0, py, px, dy, dx, l, w, r):
+        print(data.shape)
+        canvas_y, canvas_x = data.shape
+        reps_y, reps_x = canvas_y//py + 1, canvas_x//px + 1
+        cell = SlotModel.slot_cell(py, px, dy, dx, l, w, r)
+        img = np.tile(cell, (reps_y, reps_x))
+        img =  img[y0:y0+canvas_y, x0:x0+canvas_x]
         return img
+
 class MetaAnalyzer:
     def __init__(self, path):
         self.__path = path
         self.__image = self.load_image(self.__path)
         self.__contours = self.get_contours(self.__image)
         self.__rectangles = self.draw_rectangles()
-        self.test_single_model()
-        self.test_slot_function()
+        self.test_slot_cell()
+        self.test_slot_array()
 
     @staticmethod
     def load_image(path):
@@ -71,31 +74,18 @@ class MetaAnalyzer:
             cv2.drawContours(res_img, c, -1, (0,randint(100,255),randint(100,255)),2)
         plt.imshow(res_img)
         plt.show()
-        return contours
+        return contours        
     
-    def test_single_model(self):
+    def test_slot_cell(self):
+        img = SlotModel(self.__image).slot_cell(500, 500, 125, 125, 200, 100, 50)
+        plt.imshow(img)
+        plt.show()
+
+    def test_slot_array(self):
         img_gray = cv2.cvtColor(self.__image, cv2.COLOR_BGR2GRAY)
-        model = SlotModel(self.__image)
-        slot = model.single_slot(500, 500, 200, 400, 800)       
-        res_img = self.__image*0
-        ret, im = cv2.threshold(slot, 70, 256, cv2.THRESH_BINARY)
-        contours, hierarchy  = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for c in contours:
-            print(c.shape)
-            cv2.drawContours(res_img, c, -1, (0,randint(100,255),randint(100,255)),5)
-        plt.imshow(res_img, cmap="gray")
+        img = SlotModel(self.__image).slot_lattice(img_gray, 200, 100, 500, 500, 125, 125, 200, 100, 50)
+        plt.imshow(img)
         plt.show()
-
-    def test_slot_function(self):
-        model = SlotModel(self.__image)
-        slots = model.slot_function(0, 0, 500, 500, 0, 10, 50, 200)
-        plt.imshow(slots, cmap='gray')
-        plt.show()
-
-    def fit_slots(self):
-        ydata = self.__contours
-        xdata = (np.arange(self.__image.shape[0]), np.arange(self.__image.shape[1]))
-        
 
     def fit_ellipse(self):
         img = self.__image
