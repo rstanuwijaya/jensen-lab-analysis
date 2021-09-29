@@ -6,18 +6,11 @@ import matplotlib.pyplot as plt
 from random import randint
 from cv2 import ximgproc
 class SlotModel:
-    def __init__(self, canvas, x, y, r, width, height):
-        self.canvas = canvas
-        self.x = x
-        self.y = y
-        self.r = r
-        self.w = width
-        self.h = height
+    def __init__(self, canvas):
+        self.canvas = canvas * 0 
     
-    @property
-    def image(self):
-        img = self.canvas * 0
-        x, y, r, w, h = self.x, self.y, self.r, self.w, self.h 
+    def single_slot(self, y, x, r, w, h):
+        img = self.canvas
         bl = x - w//2
         br = x + w//2
         bt = y - h//2
@@ -30,15 +23,31 @@ class SlotModel:
         cv2.rectangle(img, (bl, bt + r), (br, bb - r), (255, 255, 255), -1)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         return img
-
+    
+    def slot_function(self, y0, x0, dy, dx, theta, r, w, h):
+        canvas_h, canvas_w, _ = self.canvas.shape
+        n_x = canvas_h // dx + 3
+        n_y = canvas_w // dy + 3
+        locs_x1 = np.arange(n_x)*dx+x0 
+        locs_x2 = np.arange(n_x)*dx+x0+dx//2 
+        locs_y1 = np.arange(n_y)*dy+y0 
+        locs_y2 = np.arange(n_y)*dy+y0+dy//2 
+        img = cv2.cvtColor(self.canvas, cv2.COLOR_BGR2GRAY)
+        for i in locs_x1:
+            for j in locs_y1:
+                img += self.single_slot(i, j, r, w, h)
+        for i in locs_x2:
+            for j in locs_y2:
+                img += self.single_slot(i, j, r, w, h)
+        return img
 class MetaAnalyzer:
     def __init__(self, path):
         self.__path = path
         self.__image = self.load_image(self.__path)
-        # self.__contours = self.get_contours(self.__image)
-        # self.__rectangles = self.draw_rectangles()
-        self.test_model()
-
+        self.__contours = self.get_contours(self.__image)
+        self.__rectangles = self.draw_rectangles()
+        self.test_single_model()
+        self.test_slot_function()
 
     @staticmethod
     def load_image(path):
@@ -64,18 +73,29 @@ class MetaAnalyzer:
         plt.show()
         return contours
     
-    def test_model(self):
+    def test_single_model(self):
         img_gray = cv2.cvtColor(self.__image, cv2.COLOR_BGR2GRAY)
-        model = SlotModel(self.__image, 500, 500, 200, 400, 800)
-        slot = model.image        
+        model = SlotModel(self.__image)
+        slot = model.single_slot(500, 500, 200, 400, 800)       
         res_img = self.__image*0
         ret, im = cv2.threshold(slot, 70, 256, cv2.THRESH_BINARY)
         contours, hierarchy  = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for c in contours:
             print(c.shape)
             cv2.drawContours(res_img, c, -1, (0,randint(100,255),randint(100,255)),5)
-        plt.imshow(res_img)
+        plt.imshow(res_img, cmap="gray")
         plt.show()
+
+    def test_slot_function(self):
+        model = SlotModel(self.__image)
+        slots = model.slot_function(0, 0, 500, 500, 0, 10, 50, 200)
+        plt.imshow(slots, cmap='gray')
+        plt.show()
+
+    def fit_slots(self):
+        ydata = self.__contours
+        xdata = (np.arange(self.__image.shape[0]), np.arange(self.__image.shape[1]))
+        
 
     def fit_ellipse(self):
         img = self.__image
@@ -100,7 +120,7 @@ class MetaAnalyzer:
     def draw_rectangles(self):
         img = self.__image
         contours = self.__contours
-        res_img = img * 0
+        res_img = img
         for c in contours:
             min_y = min([p[0][0] for p in c])
             max_y = max([p[0][0] for p in c])
