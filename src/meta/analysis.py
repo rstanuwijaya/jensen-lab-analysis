@@ -36,6 +36,7 @@ class SlotModel:
     def slot_lattice(_, y0, x0, py, px, dy, dx, l, w, r):
         y0, x0, py, px, dy, dx, l, w, r, = int(y0), int(x0), int(py), int(px), int(dy), int(dx), int(l), int(w), int(r),
         canvas_y, canvas_x = SlotModel.CANVAS_Y, SlotModel.CANVAS_X
+        assert canvas_y%py == 0 and canvas_x%px == 0, "Slot cell dimension is not an integer"
         reps_y, reps_x = canvas_y//py + 1, canvas_x//px + 1
         cell = SlotModel.slot_cell(py, px, dy, dx, l, w, r)
         img = np.tile(cell, (reps_y, reps_x))
@@ -91,7 +92,7 @@ class MetaAnalyzer:
         img_gray = cv2.cvtColor(self.__image, cv2.COLOR_BGR2GRAY)
         func = SlotModel.slot_lattice
         #       y0,     x0,     py,     px,     dy,     dx,     l,      w,      r,
-        p0 = (  50,     200,    450,    450,    450/4,    450/4,    200,    40,    20)
+        p0 = (  50,     200,    500,    500,    500/4,    500/4,    200,    40,    20)
 
         ydata = img_gray.flatten()
         xdata = np.arange(ydata.shape[0])
@@ -100,7 +101,9 @@ class MetaAnalyzer:
         Z_fit = z_fit.reshape(img_gray.shape)
         plt.imshow(Z_fit)
         plt.plot()
+        print("popt:")
         print(popt)
+        print("pcov:")
         print(pcov)
         
     def fit_ellipse(self):
@@ -143,5 +146,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# %%
 
 # %%
