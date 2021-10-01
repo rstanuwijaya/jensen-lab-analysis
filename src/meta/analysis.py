@@ -14,7 +14,7 @@ class SlotModel:
     CANVAS_X = 1500
     CANVAS_Y = 1000
     MIN_SLOT_SIZE = 100
-    THRESHOLD = 50
+    THRESHOLD = 40
 
     @staticmethod
     def gaussian_2d(y, x, mu_y, mu_x, s_y, s_x):
@@ -267,8 +267,8 @@ class MetaAnalyzer:
         return res_img, ellipses
     
     def analyze_ellipse(self):
-        size_l = 2*np.array([e[1][1] for e in self.ellipses])
-        size_w = 2*np.array([e[1][0] for e in self.ellipses])
+        size_l = np.array([e[1][1] for e in self.ellipses])*2*self.scale
+        size_w = np.array([e[1][0] for e in self.ellipses])*2*self.scale
         angle = np.array([e[2] for e in self.ellipses])
         return angle, size_l, size_w
 
@@ -325,8 +325,8 @@ class MetaAnalyzer:
 N = {angle.shape[0]}
 Average T: {np.average(angle)}
 Std T: {np.std(angle)}
-Average L: {np.average(size_l*self.scale)}nm
-Std L: {np.std(size_l*self.scale)}nm"""        
+Average L: {np.average(size_l)}nm
+Std L: {np.std(size_l)}nm"""        
                 pos_x, pos_y, ha = 0.02 if not is_right else 0.98, 0.95, 'right' if is_right else 'left'
                 ax3.text(pos_x, pos_y, report_l, transform=ax3.transAxes, fontsize=14,
                         verticalalignment='top', horizontalalignment=ha, bbox=props)        
@@ -337,8 +337,8 @@ Std L: {np.std(size_l*self.scale)}nm"""
 N = {angle.shape[0]}
 Average T: {np.average(angle)}
 Std T: {np.std(angle)}
-Average W: {np.average(size_w*self.scale)}nm
-Std W: {np.std(size_w*self.scale)}nm"""        
+Average W: {np.average(size_w)}nm
+Std W: {np.std(size_w)}nm"""        
                 ax4.text(pos_x, pos_y, report_w, transform=ax4.transAxes, fontsize=14,
                         verticalalignment='top', horizontalalignment=ha, bbox=props)     
 
