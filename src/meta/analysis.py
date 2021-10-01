@@ -11,8 +11,10 @@ import lmfit
 import math
 from math import sqrt, pi, exp
 class SlotModel:
-    CANVAS_X = 3000
-    CANVAS_Y = 2000
+    CANVAS_X = 1500
+    CANVAS_Y = 1000
+    MIN_SLOT_SIZE = 100
+    THRESHOLD = 50
 
     @staticmethod
     def gaussian_2d(y, x, mu_y, mu_x, s_y, s_x):
@@ -94,47 +96,42 @@ class SlotModel:
         return img.flatten()
 
 class MetaAnalyzer:
-    def __init__(self, path):
+    def __init__(self, path, angle_left, angle_right, tolerance, scale):
         self.__path = path
+        self.scale = scale # pixels per nm
+        if angle_left is not None:
+            angle_left = angle_left % 180
+            self.bound_min_left = (angle_left - tolerance/2) % 180
+            self.bound_max_left = (angle_left + tolerance/2) % 180
+        if angle_right is not None:
+            angle_right = angle_right % 180
+            self.bound_min_right = (angle_right - tolerance/2) % 180
+            self.bound_max_right = (angle_right + tolerance/2) % 180
         self.__image = self.load_image(self.__path)
         self.__contours, self.__contours_image = self.get_contours(self.__image)
-        self.__rectangles = self.draw_rectangles()
-        # self.test_slot_cell()
-        # self.test_slot_array()
-        # self.fit_lattice()
-        # self.fit_lattice_lmfit()
-        # self.fit_lattice_leastsq()
-
-        # self.test_gaussian_2d()
-        # self.test_gaussian_slot()
-        # self.test_gaussian_cell()
-        # self.test_gaussian_lattice()
-
-        self.fit_ellipse()
-        print("done")
+        self.img_rectangles, self.rectangles = self.fit_rectangles()
+        self.img_ellipses, self.ellipses = self.fit_ellipses(self.__contours_image)
+        self.param_ellipses = self.analyze_ellipse()
+        self.plot_report(savefig=True)
 
     @staticmethod
     def load_image(path):
         print(f"Loading Image from {path}")
         img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
         img = img[:SlotModel.CANVAS_Y, :SlotModel.CANVAS_X]
-        plt.imshow(img)
-        plt.show()
         return img
 
     @staticmethod
     def get_contours(img):
         img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         res_img = img_gray * 0
-        min_size = 300
-        ret, im = cv2.threshold(img_gray, 70, 255, cv2.THRESH_BINARY_INV)
+        min_size = SlotModel.MIN_SLOT_SIZE
+        ret, im = cv2.threshold(img_gray, SlotModel.THRESHOLD, 255, cv2.THRESH_BINARY_INV)
         contours, hierarchy  = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = [c for c in contours if c.shape[0] > min_size ]
-        print(f"Using contour detection algorithm for size > {min_size}")
         for c in contours:
+            # print(c.shape[0])
             cv2.drawContours(res_img, [c], -1, 255, -1)
-        plt.imshow(res_img)
-        plt.show()
         return contours, res_img 
 
     def test_gaussian_2d(self):
@@ -254,49 +251,138 @@ class MetaAnalyzer:
         self.params = self.model.make_params()
         self.result = self.model.fit(self.ydata, self.params, xdata=None)
         print(self.result.fit_report())
-        
     
-    def fit_lattice_leastsq():
-        img_gray = cv2.cvtColor(self.__image, cv2.COLOR_BGR2GRAY)
-        img_gray = cv2.GaussianBlur(img_gray, (101, 101), 0)
-
-    def fit_ellipse(self):
-        img = self.__image
+    def fit_ellipses(self, img=None):
+        if img is None:
+            img = self.__image
+        if len(img.shape) == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
         contours = self.__contours
-        res_img = img * 0
-        fit_result = []
+        res_img = img
+        ellipses = []
         for cnt in contours:
-            ellipse = cv2.fitEllipse(cnt)
-            fit_result.append(ellipse)
-            cv2.ellipse(res_img,ellipse,(0,randint(100,255),randint(100,255)),4)
-        print("Fitting ellipse")
-        plt.imshow(res_img)
-        plt.show()            
-        size_w = [e[1][0] for e in fit_result]
-        size_h = [e[1][1] for e in fit_result]
-        angle = [e[2] for e in fit_result]
+            elp = cv2.fitEllipse(cnt)
+            ellipses.append(elp)
+            cv2.ellipse(res_img,elp,(255,0,0),2)
+        return res_img, ellipses
+    
+    def analyze_ellipse(self):
+        size_l = 2*np.array([e[1][1] for e in self.ellipses])
+        size_w = 2*np.array([e[1][0] for e in self.ellipses])
+        angle = np.array([e[2] for e in self.ellipses])
+        return angle, size_l, size_w
 
-        print("avg_w: ", sum(size_w)/len(size_w))
-        print("avg_h: ", sum(size_h)/len(size_h))
-        print("avg_w: ", sum(angle)/len(angle))
+    
+    def plot_report(self, savefig=False):
+        plt.figure(figsize=(20, 20))
+        ax1 = plt.subplot(3, 2, 1)
+        ax1.imshow(self.img_rectangles)
+        ax2 = plt.subplot(3, 2, 2)
+        ax2.imshow(self.img_ellipses)
+        ax3 = plt.subplot(3, 2, (3, 4))
+        ax4 = plt.subplot(3, 2, (5, 6))
+        ax3.set_xlim(0, 180)
+        ax4.set_xlim(0, 180)
 
-    def draw_rectangles(self):
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+        angle, size_l, size_w = self.param_ellipses
+
+
+        if hasattr(self, 'bound_min_left'):
+            bound_min_left, bound_max_left = self.bound_min_left, self.bound_max_left
+            if bound_min_left < bound_max_left:
+                zone_left = np.logical_and(angle > bound_min_left, angle < bound_max_left)
+            else:
+                zone_left = np.logical_or(angle > bound_min_left, angle < bound_max_left)
+            angle_left = angle[zone_left]
+            size_l_left = size_l[zone_left]
+            size_w_left = size_w[zone_left]
+        else:
+            bound_min_left, bound_max_left = None, None
+            angle_left, size_l_left, size_w_left = None, None, None
+
+        if hasattr(self, 'bound_min_right'):
+            bound_min_right, bound_max_right = self.bound_min_right, self.bound_max_right
+            if bound_min_right < bound_max_right:
+                zone_right = np.logical_and(angle > bound_min_right, angle < bound_max_right)
+            else:
+                zone_right = np.logical_or(angle > bound_min_right, angle < bound_max_right)
+            angle_right = angle[zone_right]
+            size_l_right = size_l[zone_right]
+            size_w_right = size_w[zone_right]
+        else:
+            bound_min_right, bound_max_right = None, None
+            angle_right, size_l_right, size_w_right = None, None, None
+
+        is_right = False
+
+        for (angle, size_l, size_w) in [(angle_left, size_l_left, size_w_left), (angle_right, size_l_right, size_w_right)]:
+            if angle is not None: 
+                ax3.scatter(angle, size_l)
+                bound_min, bound_max = (bound_min_left, bound_max_left) if not is_right else (bound_min_right, bound_max_right)
+                report_l = \
+                f"""L vs. Angle from t={bound_min}:{bound_max}
+N = {angle.shape[0]}
+Average T: {np.average(angle)}
+Std T: {np.std(angle)}
+Average L: {np.average(size_l*self.scale)}nm
+Std L: {np.std(size_l*self.scale)}nm"""        
+                pos_x, pos_y, ha = 0.02 if not is_right else 0.98, 0.95, 'right' if is_right else 'left'
+                ax3.text(pos_x, pos_y, report_l, transform=ax3.transAxes, fontsize=14,
+                        verticalalignment='top', horizontalalignment=ha, bbox=props)        
+
+                ax4.scatter(angle, size_w)
+                report_w = \
+                f"""W vs. Angle from t={bound_min}:{bound_max}
+N = {angle.shape[0]}
+Average T: {np.average(angle)}
+Std T: {np.std(angle)}
+Average W: {np.average(size_w*self.scale)}nm
+Std W: {np.std(size_w*self.scale)}nm"""        
+                ax4.text(pos_x, pos_y, report_w, transform=ax4.transAxes, fontsize=14,
+                        verticalalignment='top', horizontalalignment=ha, bbox=props)     
+
+            is_right = True
+
+        if not savefig:
+            plt.show()
+        else:
+            fname = self.__path.replace(".tif", "analysis.png")
+            plt.savefig(fname)
+
+    def fit_rectangles(self):
         img = self.__image
         contours = self.__contours
         res_img = img
+        rectangles = []
         for c in contours:
             min_y = min([p[0][0] for p in c])
             max_y = max([p[0][0] for p in c])
             min_x = min([p[0][1] for p in c])
             max_x = max([p[0][1] for p in c])
-            cv2.rectangle(res_img, (min_y, min_x), (max_y, max_x), (0, 255, 0), 2)
-        plt.imshow(res_img)
-        plt.show()            
+            rect = cv2.rectangle(res_img, (min_y, min_x), (max_y, max_x), (0, 255, 0), 2)
+            rectangles.append(rect)
+        return res_img, rectangles
 
 
 def main():
-    path = os.path.abspath("/home/stnav/jensen-lab/sample/Align_P300L135_003.tif")
-    analysis = MetaAnalyzer(path)
+    dirpath = os.path.abspath("/mnt/e/Data/JensenLab/FIBImage/Set1_FIB")
+    for name in os.listdir(dirpath):
+        if not name.endswith(".tif"): continue
+        path = os.path.join(dirpath, name)
+        name = name.replace("roa", "").replace(".tif", "")
+        args = name.split("_")
+        
+        angle_left = -int(args[0])
+        angle_right = -int(args[1])
+        tolerance = 30
+        scale = 500 / 277
+        # angle_left, angle_right, tolerance = 90, None, 180
+        analysis = MetaAnalyzer(path, angle_left, angle_right, tolerance, scale)
+
+# def main():
+#     path = os.path.abspath("/home/stnav/jensen-lab/sample/Align_P300L135_003.tif")
+#     analysis = MetaAnalyzer(path)
 
 if __name__ == '__main__':
     main()
