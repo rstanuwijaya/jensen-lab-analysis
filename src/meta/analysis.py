@@ -1,17 +1,19 @@
-#%%
-%matplotlib ipympl
-import os
-import cv2
-from lmfit.lineshapes import gaussian
-from lmfit.minimizer import minimize
-import numpy as np
-import matplotlib.pyplot as plt
-from random import randint
-from scipy.optimize import curve_fit    
-import lmfit
-import math
-from math import sqrt, pi, exp, erf, sin, cos, tan
+# %%
+from scipy.optimize import curve_fit
 from scipy.special import erf
+from math import sqrt, pi, exp, erf, sin, cos, tan
+import math
+import lmfit
+from random import randint
+import matplotlib.pyplot as plt
+import numpy as np
+from lmfit.minimizer import minimize
+from lmfit.lineshapes import gaussian
+import cv2
+import os
+%matplotlib ipympl
+
+
 class SlotModel:
     CANVAS_X = 1500
     CANVAS_Y = 1000
@@ -26,7 +28,8 @@ class SlotModel:
     def gaussian_slot(y, x, *, cy, cx, t, l, w, r):
         size = y.shape
         x, y = x.ravel(), y.ravel()
-        x, y = np.array([[cos(t), -sin(t)],[sin(t), cos(t)]]) @ np.vstack((x-cx, y-cy)) + np.vstack((cx, cy))
+        x, y = np.array([[cos(t), -sin(t)], [sin(t), cos(t)]]
+                        ) @ np.vstack((x-cx, y-cy)) + np.vstack((cx, cy))
         x, y = x.reshape(size), y.reshape(size)
         return SlotModel.gaussian_flat(y, mu=cy, w=l, s=r) * SlotModel.gaussian_flat(x, mu=cx, w=w, s=r)
 
@@ -35,27 +38,29 @@ class SlotModel:
         cy1, cx1 = my - dy, mx - dx
         cy2, cx2 = my + dy, mx + dx
         return SlotModel.gaussian_slot(y, x, cy=cy1, cx=cx1, t=t1, l=l, w=w, r=r) + SlotModel.gaussian_slot(y, x, cy=cy2, cx=cx2, t=t2, l=l, w=w, r=r)
-    
+
     @staticmethod
     def gaussian_lattice(y, x, *, y0, x0, phi, py, px, t1, t2, dy, dx, l, w, r):
         size = y.shape
         x, y = x.ravel(), y.ravel()
-        x, y = np.array([[cos(phi), -sin(phi)],[sin(phi), cos(phi)]]) @ np.vstack((x, y))
+        x, y = np.array(
+            [[cos(phi), -sin(phi)], [sin(phi), cos(phi)]]) @ np.vstack((x, y))
         x, y = x.reshape(size), y.reshape(size)
-        y = np.mod(y - y0, py)
-        x = np.mod(x - x0, px)
+        x, y = np.mod(x - x0, px), np.mod(y - y0, py)
         return SlotModel.gaussian_cell(y, x, my=py/2, mx=px/2, py=py, px=px, t1=t1, t2=t2, dy=dy, dx=dx, l=l, w=w, r=r)
 
     @staticmethod
     def gaussian_fit(xdata, y0, x0, phi, py, px, t1, t2, dy, dx, l, w, r):
         y, x = xdata
-        img =  255 * SlotModel.gaussian_lattice(y, x, y0=y0, x0=x0, phi=phi, py=py, px=px, t1=t1, t2=t2, dy=dy, dx=dx, l=l, w=w, r=r)
+        img = 255 * SlotModel.gaussian_lattice(
+            y, x, y0=y0, x0=x0, phi=phi, py=py, px=px, t1=t1, t2=t2, dy=dy, dx=dx, l=l, w=w, r=r)
         return img
+
 
 class MetaAnalyzer:
     def __init__(self, path, angle_left, angle_right, tolerance, scale):
         self.__path = path
-        self.scale = scale # pixels per nm
+        self.scale = scale  # pixels per nm
         if angle_left is not None:
             angle_left = angle_left % 180
             self.bound_min_left = (angle_left - tolerance/2) % 180
@@ -65,7 +70,8 @@ class MetaAnalyzer:
             self.bound_min_right = (angle_right - tolerance/2) % 180
             self.bound_max_right = (angle_right + tolerance/2) % 180
         self.__image = self.load_image(self.__path)
-        self.__contours, self.__contours_image = self.get_contours(self.__image)
+        self.__contours, self.__contours_image = self.get_contours(
+            self.__image)
         # self.img_rectangles, self.rectangles = self.fit_rectangles()
         # self.img_ellipses, self.ellipses = self.fit_ellipses(self.__contours_image)
         # self.param_ellipses = self.analyze_ellipse()
@@ -84,24 +90,27 @@ class MetaAnalyzer:
         img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         res_img = img_gray * 0
         min_size = SlotModel.MIN_SLOT_SIZE
-        ret, im = cv2.threshold(img_gray, SlotModel.THRESHOLD, 255, cv2.THRESH_BINARY_INV)
-        contours, hierarchy  = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        contours = [c for c in contours if c.shape[0] > min_size ]
+        ret, im = cv2.threshold(
+            img_gray, SlotModel.THRESHOLD, 255, cv2.THRESH_BINARY_INV)
+        contours, hierarchy = cv2.findContours(
+            im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = [c for c in contours if c.shape[0] > min_size]
         for c in contours:
             # print(c.shape[0])
             cv2.drawContours(res_img, [c], -1, 255, -1)
-        return contours, res_img 
+        return contours, res_img
 
     def fit_lattice_lmfit(self):
-        img_gray = cv2.cvtColor(self.__image, cv2.COLOR_BGR2GRAY)
         # img_gray = cv2.GaussianBlur(img_gray, (101, 101), 0)
-        self.ydata = img_gray.flatten()
-        y, x = np.arange(img_gray.shape[0]), np.arange(img_gray.shape[1])
+        self.ydata = self.__contours_image.flatten()
+        y, x = np.arange(self.__contours_image.shape[0]), np.arange(
+            self.__contours_image.shape[1])
         X, Y = np.meshgrid(x, y)
         Y, X = Y.ravel(), X.ravel()
         xdata = np.vstack((Y, X))
         self.model = lmfit.Model(SlotModel.gaussian_fit, name="test model")
-        default_hint = {'value': 1, 'min': -math.inf, 'max': math.inf, 'vary': False, 'expr': None,}
+        default_hint = {'value': 1, 'min': -math.inf,
+                        'max': math.inf, 'vary': False, 'expr': None, }
         self.init_params = {
             'y0': {
                 'value': 0,
@@ -112,12 +121,12 @@ class MetaAnalyzer:
                 'vary': True,
             },
             'py': {
-                'value': 177,
+                'value': 180,
                 'vary': True,
                 'min': 0
             },
             'px': {
-                'value': 177,
+                'value': 183,
                 'vary': True,
                 'min': 0
             },
@@ -155,41 +164,47 @@ class MetaAnalyzer:
                 'max': pi/2
             },
             't2': {
-                'value': pi/2,
+                'value': 0,
                 'vary': True,
                 'min': -pi/2,
                 'max': pi/2
             },
             'phi': {
-                'value': pi/2,
+                'value': -pi/180*2.5,
                 'vary': True,
                 'min': -pi/2,
                 'max': pi/2
             }
         }
         for param_name in self.model.param_names:
-            self.model.set_param_hint(param_name, 
-                value=self.init_params.get(param_name, default_hint).get('value', default_hint['value']),
-                min=self.init_params.get(param_name, default_hint).get('min', default_hint['min']),
-                max=self.init_params.get(param_name, default_hint).get('max', default_hint['max']),
-                vary=self.init_params.get(param_name, default_hint).get('vary', default_hint['vary']),
-                )
+            self.model.set_param_hint(param_name,
+                                      value=self.init_params.get(param_name, default_hint).get(
+                                          'value', default_hint['value']),
+                                      min=self.init_params.get(param_name, default_hint).get(
+                                          'min', default_hint['min']),
+                                      max=self.init_params.get(param_name, default_hint).get(
+                                          'max', default_hint['max']),
+                                      vary=self.init_params.get(param_name, default_hint).get(
+                                          'vary', default_hint['vary']),
+                                      )
         self.params = self.model.make_params()
-        def callback(params, iter, resid, *args, **kws):
-            print(iter)
 
-        # self.result = self.model.fit(self.ydata, self.params, xdata=xdata,verbose=True, iter_cb=callback)
-        # self.params = self.result.params
-        # print(self.result.fit_report())
+        def callback(params, iter, resid, *args, **kws):
+            # print(iter)
+            pass
+
+        self.result = self.model.fit(
+            self.ydata, self.params, xdata=xdata, verbose=True, iter_cb=callback)
+        self.params = self.result.params
+        print(self.result.fit_report())
         Z = self.model.eval(self.params, xdata=xdata)
-        R = self.ydata - Z
-        Z = Z.reshape(img_gray.shape)
-        R = R.reshape(img_gray.shape)
-        plt.imshow(Z, interpolation='None', cmap="gray")
-        plt.show()
+        R = self.__contours_image.ravel() - Z
+        Z = Z.reshape(self.__contours_image.shape)
+        R = R.reshape(self.__contours_image.shape)
+        # plt.imshow(Z, interpolation='None', cmap="gray")
         plt.imshow(R, interpolation='None', cmap="gray")
         plt.show()
-    
+
     def fit_ellipses(self, img=None):
         if img is None:
             img = self.__image
@@ -201,16 +216,15 @@ class MetaAnalyzer:
         for cnt in contours:
             elp = cv2.fitEllipse(cnt)
             ellipses.append(elp)
-            cv2.ellipse(res_img,elp,(255,0,0),2)
+            cv2.ellipse(res_img, elp, (255, 0, 0), 2)
         return res_img, ellipses
-    
+
     def analyze_ellipse(self):
         size_l = np.array([e[1][1] for e in self.ellipses])*2*self.scale
         size_w = np.array([e[1][0] for e in self.ellipses])*2*self.scale
         angle = np.array([e[2] for e in self.ellipses])
         return angle, size_l, size_w
 
-    
     def plot_report(self, savefig=False):
         plt.figure(figsize=(20, 20))
         ax1 = plt.subplot(3, 2, 1)
@@ -225,13 +239,14 @@ class MetaAnalyzer:
         props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
         angle, size_l, size_w = self.param_ellipses
 
-
         if hasattr(self, 'bound_min_left'):
             bound_min_left, bound_max_left = self.bound_min_left, self.bound_max_left
             if bound_min_left < bound_max_left:
-                zone_left = np.logical_and(angle > bound_min_left, angle < bound_max_left)
+                zone_left = np.logical_and(
+                    angle > bound_min_left, angle < bound_max_left)
             else:
-                zone_left = np.logical_or(angle > bound_min_left, angle < bound_max_left)
+                zone_left = np.logical_or(
+                    angle > bound_min_left, angle < bound_max_left)
             angle_left = angle[zone_left]
             size_l_left = size_l[zone_left]
             size_w_left = size_w[zone_left]
@@ -242,9 +257,11 @@ class MetaAnalyzer:
         if hasattr(self, 'bound_min_right'):
             bound_min_right, bound_max_right = self.bound_min_right, self.bound_max_right
             if bound_min_right < bound_max_right:
-                zone_right = np.logical_and(angle > bound_min_right, angle < bound_max_right)
+                zone_right = np.logical_and(
+                    angle > bound_min_right, angle < bound_max_right)
             else:
-                zone_right = np.logical_or(angle > bound_min_right, angle < bound_max_right)
+                zone_right = np.logical_or(
+                    angle > bound_min_right, angle < bound_max_right)
             angle_right = angle[zone_right]
             size_l_right = size_l[zone_right]
             size_w_right = size_w[zone_right]
@@ -255,30 +272,31 @@ class MetaAnalyzer:
         is_right = False
 
         for (angle, size_l, size_w) in [(angle_left, size_l_left, size_w_left), (angle_right, size_l_right, size_w_right)]:
-            if angle is not None: 
+            if angle is not None:
                 ax3.scatter(angle, size_l)
-                bound_min, bound_max = (bound_min_left, bound_max_left) if not is_right else (bound_min_right, bound_max_right)
+                bound_min, bound_max = (bound_min_left, bound_max_left) if not is_right else (
+                    bound_min_right, bound_max_right)
                 report_l = \
-                f"""L vs. Angle from t={bound_min}:{bound_max}
+                    f"""L vs. Angle from t={bound_min}:{bound_max}
 N = {angle.shape[0]}
 Average T: {np.average(angle)}
 Std T: {np.std(angle)}
 Average L: {np.average(size_l)}nm
-Std L: {np.std(size_l)}nm"""        
+Std L: {np.std(size_l)}nm"""
                 pos_x, pos_y, ha = 0.02 if not is_right else 0.98, 0.95, 'right' if is_right else 'left'
                 ax3.text(pos_x, pos_y, report_l, transform=ax3.transAxes, fontsize=14,
-                        verticalalignment='top', horizontalalignment=ha, bbox=props)        
+                         verticalalignment='top', horizontalalignment=ha, bbox=props)
 
                 ax4.scatter(angle, size_w)
                 report_w = \
-                f"""W vs. Angle from t={bound_min}:{bound_max}
+                    f"""W vs. Angle from t={bound_min}:{bound_max}
 N = {angle.shape[0]}
 Average T: {np.average(angle)}
 Std T: {np.std(angle)}
 Average W: {np.average(size_w)}nm
-Std W: {np.std(size_w)}nm"""        
+Std W: {np.std(size_w)}nm"""
                 ax4.text(pos_x, pos_y, report_w, transform=ax4.transAxes, fontsize=14,
-                        verticalalignment='top', horizontalalignment=ha, bbox=props)     
+                         verticalalignment='top', horizontalalignment=ha, bbox=props)
 
             is_right = True
 
@@ -298,7 +316,8 @@ Std W: {np.std(size_w)}nm"""
             max_y = max([p[0][0] for p in c])
             min_x = min([p[0][1] for p in c])
             max_x = max([p[0][1] for p in c])
-            rect = cv2.rectangle(res_img, (min_y, min_x), (max_y, max_x), (0, 255, 0), 2)
+            rect = cv2.rectangle(res_img, (min_y, min_x),
+                                 (max_y, max_x), (0, 255, 0), 2)
             rectangles.append(rect)
         return res_img, rectangles
 
@@ -306,17 +325,19 @@ Std W: {np.std(size_w)}nm"""
 def main():
     dirpath = os.path.abspath("/mnt/e/Data/JensenLab/FIBImage/Set1_FIB")
     for name in os.listdir(dirpath):
-        if not name.endswith(".tif"): continue
+        if not name.endswith(".tif"):
+            continue
         path = os.path.join(dirpath, name)
         name = name.replace("roa", "").replace(".tif", "")
         args = name.split("_")
-        
+
         angle_left = -int(args[0])
         angle_right = -int(args[1])
         tolerance = 30
         scale = 500 / 277
         # angle_left, angle_right, tolerance = 90, None, 180
-        analysis = MetaAnalyzer(path, angle_left, angle_right, tolerance, scale)
+        analysis = MetaAnalyzer(
+            path, angle_left, angle_right, tolerance, scale)
         break
 
 # def main():
@@ -355,6 +376,7 @@ def main():
 #     ax.imshow(Z)
 
 #     plt.show()
+
 
 if __name__ == '__main__':
     main()
