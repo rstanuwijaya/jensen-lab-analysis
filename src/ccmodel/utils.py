@@ -5,7 +5,6 @@ import matplotlib
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import scipy.sparse as sp
-from fast_histogram import histogram1d
 from . import utils
 
 def count_frames_txt(path):
