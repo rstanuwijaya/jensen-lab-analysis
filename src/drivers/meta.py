@@ -93,10 +93,12 @@ def main():
         analysis_list.append(analysis)
         print(result.fit_report())
         Z = analysis.model.eval(analysis.params, xdata=analysis.xdata)
-        R = analysis.contours_image.ravel() - Z
-        Z = Z.reshape(analysis.contours_image.shape)
+        R = Z - analysis.contours_image.ravel()
         R = R.reshape(analysis.contours_image.shape)
-        plt.imshow(R, interpolation='None', cmap="gray")
+        fig, axs = plt.subplots(1, 2)
+        fig.set_size_inches(18.5, 10.5)
+        axs[0].imshow(analysis.image, cmap="gray")
+        axs[1].imshow(R, cmap="gray")
         plt.show()
         break
 
