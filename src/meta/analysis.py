@@ -1,4 +1,5 @@
 #%%
+%matplotlib ipympl
 import os
 import cv2
 from lmfit.lineshapes import gaussian
@@ -9,7 +10,8 @@ from random import randint
 from scipy.optimize import curve_fit    
 import lmfit
 import math
-from math import sqrt, pi, exp
+from math import sqrt, pi, exp, erf, sin, cos, tan
+from scipy.special import erf
 class SlotModel:
     CANVAS_X = 1500
     CANVAS_Y = 1000
@@ -17,83 +19,32 @@ class SlotModel:
     THRESHOLD = 40
 
     @staticmethod
-    def gaussian_2d(y, x, mu_y, mu_x, s_y, s_x):
-        return 1. / np.sqrt(2*np.pi*s_x*s_y) * np.exp(-((x-mu_x)**2/(2*s_x**2)+(y-mu_y)**2/(2*s_y**2)))
+    def gaussian_flat(x, mu, w, s):
+        return -1. / 2. * (erf((2*mu - w - 2*x)/(2*np.sqrt(2)*s)) - erf((2*mu + w - 2*x)/(2*np.sqrt(2)*s)))
 
     @staticmethod
-    def gaussian_slot(y, x, cy, cx, l, w, r):
-        img = np.zeros(x.shape)
-        bl = cx - w/2
-        br = cx + w/2
-        bt = cy - l/2
-        bb = cy + l/2
-        img += SlotModel.gaussian_2d(y, x, bl, bt, r, r)
-        img += SlotModel.gaussian_2d(y, x, br, bt, r, r)
-        img += SlotModel.gaussian_2d(y, x, bl, bb, r, r)
-        img += SlotModel.gaussian_2d(y, x, br, bb, r, r)
-        bt, bb = int(bt), int(bb)
-        bl, br = int(bl), int(br)
-        img[bt:bb, :] = img[:, None][bt, :]
-        img[:, bl:br] = img[:, bl][:, None]
-        return img
+    def gaussian_slot(y, x, cy, cx, t, l, w, r):
+        # x, y = np.array([[cos(t), sin(t)],[-sin(t), cos(t)]]) @ x, y
+        return SlotModel.gaussian_flat(y, cy, l, r) * SlotModel.gaussian_flat(x, cx, w, r)
 
     @staticmethod
-    def gaussian_cell(y, x, my, mx, py, px, dx, dy, l, w, r):
-        print(mx, my)
-        img = np.zeros(x.shape)
+    def gaussian_cell(y, x, my, mx, py, px, dy, dx, l, w, r):
         cy1, cx1 = my - dy, mx - dx
         cy2, cx2 = my + dy, mx + dx
-        img += SlotModel.gaussian_slot(y, x, cy1, cx1, l, w, r)
-        img += SlotModel.gaussian_slot(y, x, cy2, cx2, l, w, r)
-        return img
+        t1, t2 = 0, 0
+        return SlotModel.gaussian_slot(y, x, cy1, cx1, t1, l, w, r) + SlotModel.gaussian_slot(y, x, cy2, cx2, t2, l, w, r)
     
     @staticmethod
     def gaussian_lattice(y, x, y0, x0, py, px, dy, dx, l, w, r):
-        img = np.zeros(x.shape)
-        reps_y = y.shape[0] // py + 1
-        reps_x = x.shape[1] // px + 1
-        for j in range(reps_y):
-            for i in range(reps_x):
-                img += SlotModel.gaussian_cell(y, x, j*py - y0, i*px - x0, py, px, dx, dy, l, w, r)
+        y_ = np.mod(y - y0, py)
+        x_ = np.mod(x - x0, px)
+        return SlotModel.gaussian_cell(y_, x_, py/2, px/2, py, px, dy, dx, l, w, r)
+
+    @staticmethod
+    def gaussian_fit(xdata, y0, x0, py, px, dy, dx, l, w, r):
+        y, x = xdata
+        img =  255 * SlotModel.gaussian_lattice(y, x, y0, x0, py, px, dy, dx, l, w, r)
         return img
-
-    @staticmethod
-    def single_slot(cell, y, x, l, w, r):
-        # rounded rectangular slot oriented vertically
-        bl = x - w//2
-        br = x + w//2
-        bt = y - l//2
-        bb = y + l//2
-        cv2.circle(cell, (bl + r, bt + r), r, 255, -1)
-        cv2.circle(cell, (br - r, bt + r), r, 255, -1)
-        cv2.circle(cell, (bl + r, bb - r), r, 255, -1)
-        cv2.circle(cell, (br - r, bb - r), r, 255, -1)
-        cv2.rectangle(cell, (bl + r, bt), (br - r, bb), 255, -1)
-        cv2.rectangle(cell, (bl, bt + r), (br, bb - r), 255, -1)
-        return cell
-
-    @staticmethod
-    def slot_cell(py, px, dx, dy, l, w, r):
-        # unit cell containing a pair of single slots located
-        py, px = int(py), int(px)
-        img = np.zeros((py, px), np.uint8)
-        img = SlotModel.single_slot(img, py//2-dy, px//2+dx, l, w, r)
-        img = SlotModel.single_slot(img, py//2+dy, px//2-dx, l, w, r)
-        return img
-
-    @staticmethod
-    def slot_lattice(xdata, y0, x0, py, px, dy, dx, l, w, r):
-        # lattice of the slots on a given canvas
-        print(y0, x0, py, px, dy, dx, l, w, r,)
-        y0, x0, py, px, dy, dx, l, w, r, = int(y0), int(x0), int(py), int(px), int(dy), int(dx), int(l), int(w), int(r),
-        canvas_y, canvas_x = SlotModel.CANVAS_Y, SlotModel.CANVAS_X
-        # assert canvas_y%py == 0 and canvas_x%px == 0, "Slot cell dimension is not an integer"
-        reps_y, reps_x = canvas_y//py + 1, canvas_x//px + 1
-        cell = SlotModel.slot_cell(py, px, dy, dx, l, w, r)
-        img = np.tile(cell, (reps_y, reps_x))
-        img =  img[y0:y0+canvas_y, x0:x0+canvas_x]
-        img = cv2.GaussianBlur(img, (101, 101), 0)
-        return img.flatten()
 
 class MetaAnalyzer:
     def __init__(self, path, angle_left, angle_right, tolerance, scale):
@@ -109,10 +60,11 @@ class MetaAnalyzer:
             self.bound_max_right = (angle_right + tolerance/2) % 180
         self.__image = self.load_image(self.__path)
         self.__contours, self.__contours_image = self.get_contours(self.__image)
-        self.img_rectangles, self.rectangles = self.fit_rectangles()
-        self.img_ellipses, self.ellipses = self.fit_ellipses(self.__contours_image)
-        self.param_ellipses = self.analyze_ellipse()
-        self.plot_report(savefig=True)
+        # self.img_rectangles, self.rectangles = self.fit_rectangles()
+        # self.img_ellipses, self.ellipses = self.fit_ellipses(self.__contours_image)
+        # self.param_ellipses = self.analyze_ellipse()
+        # self.plot_report(savefig=True)
+        self.fit_lattice_lmfit()
 
     @staticmethod
     def load_image(path):
@@ -134,111 +86,61 @@ class MetaAnalyzer:
             cv2.drawContours(res_img, [c], -1, 255, -1)
         return contours, res_img 
 
-    def test_gaussian_2d(self):
-        print("testing gaussian")
-        y = np.linspace(-100, 100, 200)
-        x = np.linspace(-100, 100, 200)
-        y, x = np.meshgrid(y, x)
-        img = SlotModel.gaussian_2d(y, x, 50, 50, 20, 20)
-        plt.imshow(img)
-        plt.show()     
-
-    def test_gaussian_slot(self):
-        print("testing slot")
-        y = np.linspace(0, 500, 400)
-        x = np.linspace(0, 500, 400)
-        y, x = np.meshgrid(y, x)
-        img = SlotModel.gaussian_slot(y, x, 250, 250, 100, 20, 5)
-        plt.imshow(img)
-        plt.show()     
-
-    def test_gaussian_cell(self):
-        print("testing gaussian")
-        y = np.linspace(0, 500, 400)
-        x = np.linspace(0, 500, 400)
-        y, x = np.meshgrid(y, x)
-        img = SlotModel.gaussian_cell(y, x, 250, 250, 200, 200, 50, 50, 100, 20, 5)
-        plt.imshow(img)
-        plt.show()    
-
-    def test_gaussian_lattice(self):
-        print("testing gaussian")
-        y = np.linspace(0, 3000, 200)
-        x = np.linspace(0, 3000, 200)
-        y, x = np.meshgrid(y, x)
-        img = SlotModel.gaussian_lattice(y, x, 0, 0, 500, 500, 250, 250, 100, 20, 5)
-        plt.imshow(img)
-        plt.show()     
-
-    def test_slot_cell(self):
-        img = SlotModel(self.__image).slot_cell(500, 500, 125, 125, 200, 100, 50)
-        plt.imshow(img)
-        plt.show()
-
-    def test_slot_array(self):
-        img_gray = cv2.cvtColor(self.__image, cv2.COLOR_BGR2GRAY)
-        img = SlotModel.slot_lattice(img_gray, 200, 100, 500, 500, 125, 125, 200, 100, 50)
-
-    def fit_lattice(self):
-        img_gray = cv2.cvtColor(self.__image, cv2.COLOR_BGR2GRAY)
-        func = SlotModel.slot_lattice
-        #       y0,     x0,     py,     px,     dy,     dx,     l,      w,      r,
-        p0 = (  50,     200,    500,    500,    500/4,    500/4,    200,    40,    20)
-
-        ydata = img_gray.flatten()
-        xdata = np.arange(ydata.shape[0])
-        popt, pcov = curve_fit(func, xdata, ydata, p0=p0)
-        z_fit = func(xdata, *popt)
-        Z_fit = z_fit.reshape(img_gray.shape)
-        plt.imshow(Z_fit)
-        plt.plot()
-        print("popt:")
-        print(popt)
-        print("pcov:")
-        print(pcov)
-
     def fit_lattice_lmfit(self):
         img_gray = cv2.cvtColor(self.__image, cv2.COLOR_BGR2GRAY)
-        img_gray = cv2.GaussianBlur(img_gray, (101, 101), 0)
+        # img_gray = cv2.GaussianBlur(img_gray, (101, 101), 0)
         self.ydata = img_gray.flatten()
-        self.model = lmfit.Model(SlotModel.slot_lattice, name="test model")
+        y, x = np.arange(img_gray.shape[0]), np.arange(img_gray.shape[1])
+        X, Y = np.meshgrid(x, y)
+        Y, X = Y.ravel(), X.ravel()
+        xdata = np.vstack((Y, X))
+        self.model = lmfit.Model(SlotModel.gaussian_fit, name="test model")
         default_hint = {'value': 1, 'min': -math.inf, 'max': math.inf, 'vary': False, 'expr': None,}
         self.init_params = {
             'y0': {
-                'value': 50,
-                'vary': False,
+                'value': 0,
+                'vary': True,
             },
             'x0': {
-                'value': 200,
-                'vary': False,
+                'value': 0,
+                'vary': True,
             },
             'py': {
-                'value': 500,
+                'value': 177,
                 'vary': True,
+                'min': 0
             },
             'px': {
-                'value': 500,
+                'value': 177,
                 'vary': True,
+                'min': 0
             },
             'dy': {
-                'value': 500//4,
-                'vary': False,
+                'value': 177//4,
+                'vary': True,
+                'min': 0
             },
             'dx': {
-                'value': 500//4,
-                'vary': False,
+                'value': 177//4,
+                'vary': True,
+                'min': 0
             },
             'l': {
-                'value': 200,
+                'value': 177/2,
                 'vary': True,
+                'min': 0,
+                'max': 177
             },
             'w': {
-                'value': 50,
+                'value': 20,
                 'vary': True,
+                'min': 0,
+                'max': 177/4
             },
             'r': {
-                'value': 10,
+                'value': 2,
                 'vary': True,
+                'min': 0
             },
         }
         for param_name in self.model.param_names:
@@ -249,8 +151,20 @@ class MetaAnalyzer:
                 vary=self.init_params.get(param_name, default_hint).get('vary', default_hint['vary']),
                 )
         self.params = self.model.make_params()
-        self.result = self.model.fit(self.ydata, self.params, xdata=None)
-        print(self.result.fit_report())
+        def callback(params, iter, resid, *args, **kws):
+            print(iter)
+
+        # self.result = self.model.fit(self.ydata, self.params, xdata=xdata,verbose=True, iter_cb=callback)
+        # self.params = self.result.params
+        # print(self.result.fit_report())
+        Z = self.model.eval(self.params, xdata=xdata)
+        R = self.ydata - Z
+        Z = Z.reshape(img_gray.shape)
+        R = R.reshape(img_gray.shape)
+        plt.imshow(Z, interpolation='None', cmap="gray")
+        plt.show()
+        plt.imshow(R, interpolation='None', cmap="gray")
+        plt.show()
     
     def fit_ellipses(self, img=None):
         if img is None:
@@ -379,10 +293,42 @@ def main():
         scale = 500 / 277
         # angle_left, angle_right, tolerance = 90, None, 180
         analysis = MetaAnalyzer(path, angle_left, angle_right, tolerance, scale)
+        break
 
 # def main():
-#     path = os.path.abspath("/home/stnav/jensen-lab/sample/Align_P300L135_003.tif")
-#     analysis = MetaAnalyzer(path)
+#     #testing slot main
+#     fig = plt.figure()
+#     ax = fig.gca()
+#     x = np.linspace(-10, 10, 1000)
+#     y = np.linspace(-10, 10, 1000)
+#     z = SlotModel.gaussian_flat(x, 0, 4, 0.2)
+#     ax.plot(x, z)
+
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111, projection='3d')
+#     Y, X = np.meshgrid(y, x)
+#     Z = SlotModel.gaussian_slot(Y, X, 0, 0, 4, 2, 0.2)
+#     fig.suptitle("Gaussian Slot")
+#     ax.plot_surface(X, Y, Z)
+
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111, projection='3d')
+#     Z = SlotModel.gaussian_cell(Y, X, 0, 0, 10, 10, 2.5, 2.5, 4, 2, 0.2)
+#     fig.suptitle("Slot Cell")
+#     ax.plot_surface(X, Y, Z)
+
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111)
+#     x = np.linspace(-10, 10, 2000)
+#     y = np.linspace(-10, 10, 3000)
+#     Y, X = np.meshgrid(y, x)
+#     X, Y = np.meshgrid(x, y)
+#     Z = SlotModel.gaussian_lattice(Y, X, 0, 0, 10, 10, 2.5, 2.5, 4, 2, 0.2)
+#     fig.suptitle("Slot lattice")
+#     # ax.plot_surface(X, Y, Z)
+#     ax.imshow(Z)
+
+#     plt.show()
 
 if __name__ == '__main__':
     main()
