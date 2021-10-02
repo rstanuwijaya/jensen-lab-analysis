@@ -19,33 +19,37 @@ class SlotModel:
     THRESHOLD = 40
 
     @staticmethod
-    def gaussian_flat(x, mu, w, s):
+    def gaussian_flat(x, *, mu, w, s):
         return -1. / 2. * (erf((2*mu - w - 2*x)/(2*np.sqrt(2)*s)) - erf((2*mu + w - 2*x)/(2*np.sqrt(2)*s)))
 
     @staticmethod
-    def gaussian_slot(y, x, cy, cx, t, l, w, r):
+    def gaussian_slot(y, x, *, cy, cx, t, l, w, r):
         size = y.shape
         x, y = x.ravel(), y.ravel()
-        x, y = np.array([[cos(t), sin(t)],[-sin(t), cos(t)]]) @ np.vstack((x-cx, y-cy)) + np.vstack((cx, cy))
+        x, y = np.array([[cos(t), -sin(t)],[sin(t), cos(t)]]) @ np.vstack((x-cx, y-cy)) + np.vstack((cx, cy))
         x, y = x.reshape(size), y.reshape(size)
-        return SlotModel.gaussian_flat(y, cy, l, r) * SlotModel.gaussian_flat(x, cx, w, r)
+        return SlotModel.gaussian_flat(y, mu=cy, w=l, s=r) * SlotModel.gaussian_flat(x, mu=cx, w=w, s=r)
 
     @staticmethod
-    def gaussian_cell(y, x, my, mx, py, px, t1, t2, dy, dx, l, w, r):
+    def gaussian_cell(y, x, *, my, mx, py, px, t1, t2, dy, dx, l, w, r):
         cy1, cx1 = my - dy, mx - dx
         cy2, cx2 = my + dy, mx + dx
-        return SlotModel.gaussian_slot(y, x, cy1, cx1, t1, l, w, r) + SlotModel.gaussian_slot(y, x, cy2, cx2, t2, l, w, r)
+        return SlotModel.gaussian_slot(y, x, cy=cy1, cx=cx1, t=t1, l=l, w=w, r=r) + SlotModel.gaussian_slot(y, x, cy=cy2, cx=cx2, t=t2, l=l, w=w, r=r)
     
     @staticmethod
-    def gaussian_lattice(y, x, y0, x0, py, px, t1, t2, dy, dx, l, w, r):
-        y_ = np.mod(y - y0, py)
-        x_ = np.mod(x - x0, px)
-        return SlotModel.gaussian_cell(y_, x_, py/2, px/2, py, px, t1, t2, dy, dx, l, w, r)
+    def gaussian_lattice(y, x, *, y0, x0, phi, py, px, t1, t2, dy, dx, l, w, r):
+        size = y.shape
+        x, y = x.ravel(), y.ravel()
+        x, y = np.array([[cos(phi), -sin(phi)],[sin(phi), cos(phi)]]) @ np.vstack((x, y))
+        x, y = x.reshape(size), y.reshape(size)
+        y = np.mod(y - y0, py)
+        x = np.mod(x - x0, px)
+        return SlotModel.gaussian_cell(y, x, my=py/2, mx=px/2, py=py, px=px, t1=t1, t2=t2, dy=dy, dx=dx, l=l, w=w, r=r)
 
     @staticmethod
-    def gaussian_fit(xdata, y0, x0, py, px, t1, t2, dy, dx, l, w, r):
+    def gaussian_fit(xdata, y0, x0, phi, py, px, t1, t2, dy, dx, l, w, r):
         y, x = xdata
-        img =  255 * SlotModel.gaussian_lattice(y, x, y0, x0, py, px, t1, t2, dy, dx, l, w, r)
+        img =  255 * SlotModel.gaussian_lattice(y, x, y0=y0, x0=x0, phi=phi, py=py, px=px, t1=t1, t2=t2, dy=dy, dx=dx, l=l, w=w, r=r)
         return img
 
 class MetaAnalyzer:
@@ -147,13 +151,21 @@ class MetaAnalyzer:
             't1': {
                 'value': 0,
                 'vary': True,
-                'min': 0
+                'min': -pi/2,
+                'max': pi/2
             },
             't2': {
                 'value': pi/2,
                 'vary': True,
-                'min': 0
+                'min': -pi/2,
+                'max': pi/2
             },
+            'phi': {
+                'value': pi/2,
+                'vary': True,
+                'min': -pi/2,
+                'max': pi/2
+            }
         }
         for param_name in self.model.param_names:
             self.model.set_param_hint(param_name, 
@@ -307,42 +319,42 @@ def main():
         analysis = MetaAnalyzer(path, angle_left, angle_right, tolerance, scale)
         break
 
-def main():
-    # testing slot main
-    fig = plt.figure()
-    ax = fig.gca()
-    x = np.linspace(-10, 10, 1000)
-    y = np.linspace(-10, 10, 1000)
-    z = SlotModel.gaussian_flat(x, 0, 4, 0.2)
-    ax.plot(x, z)
+# def main():
+#     # # testing slot main
+#     fig = plt.figure()
+#     ax = fig.gca()
+#     x = np.linspace(-10, 10, 1000)
+#     y = np.linspace(-10, 10, 1000)
+#     z = SlotModel.gaussian_flat(x, mu=0, w=4, s=0.2)
+#     ax.plot(x, z)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    X, Y = np.meshgrid(x, y)
-    Z = SlotModel.gaussian_slot(Y, X, 0, 0, 0, 4, 2, 0.2)
-    fig.suptitle("Gaussian Slot")
-    # ax.plot_surface(X, Y, Z)
-    ax.imshow(Z)
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111)
+#     X, Y = np.meshgrid(x, y)
+#     Z = SlotModel.gaussian_slot(Y, X, cy=0, cx=0, t=0, l=4, w=2, r=0.2)
+#     fig.suptitle("Gaussian Slot")
+#     # ax.plot_surface(X, Y, Z)
+#     ax.imshow(Z)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    X, Y = np.meshgrid(x, y)
-    Z = SlotModel.gaussian_cell(Y, X, 0, 0, 10, 10, 0, 0, 2.5, 2.5, 4, 2, 0.2)
-    fig.suptitle("Slot Cell")
-    # ax.plot_surface(X, Y, Z)
-    ax.imshow(Z)
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111)
+#     X, Y = np.meshgrid(x, y)
+#     Z = SlotModel.gaussian_cell(Y, X, my=0, mx=0, py=10, px=10, t1=0, t2=0, dy=2.5, dx=2.5, l=4, w=2, r=0.2)
+#     fig.suptitle("Slot Cell")
+#     # ax.plot_surface(X, Y, Z)
+#     ax.imshow(Z)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    x = np.linspace(-10, 10, 3000)
-    y = np.linspace(-10, 10, 2000)
-    X, Y = np.meshgrid(x, y)
-    Z = SlotModel.gaussian_lattice(Y, X, 0, 0, 10, 10, 0, pi/6, 2.5, 2.5, 4, 2, 0.2)
-    fig.suptitle("Slot lattice")
-    # ax.plot_surface(X, Y, Z)
-    ax.imshow(Z)
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111)
+#     x = np.linspace(-10, 10, 3000)
+#     y = np.linspace(-10, 10, 2000)
+#     X, Y = np.meshgrid(x, y)
+#     Z = SlotModel.gaussian_lattice(Y, X, y0=0, x0=0, phi=pi/6/4, py=10, px=10, t1=0, t2=0, dy=2.5, dx=2.5, l=4, w=2, r=0.2)
+#     fig.suptitle("Slot lattice")
+#     # ax.plot_surface(X, Y, Z)
+#     ax.imshow(Z)
 
-    plt.show()
+#     plt.show()
 
 if __name__ == '__main__':
     main()
