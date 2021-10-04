@@ -4,6 +4,7 @@ import time
 import numpy as np
 from math import pi
 import matplotlib.pyplot as plt
+import lmfit
 
 from meta import MetaAnalyzer
 from meta import SlotModel
@@ -81,7 +82,12 @@ def main():
         }
     }
     dirpath = os.path.abspath("/mnt/e/Data/JensenLab/FIBImage/Set1_FIB")
-    for name in os.listdir(dirpath):
+    images = []
+    for file in os.listdir(dirpath):
+        if file.endswith('.tif'):
+            images.append(file)
+    for iter, name in enumerate(images):
+        if iter != 1: continue
         if not name.endswith(".tif"):
             continue
         path = os.path.join(dirpath, name)
@@ -92,15 +98,31 @@ def main():
         result = analysis.fit_lattice_lmfit()
         analysis_list.append(analysis)
         print(result.fit_report())
+        # print(result.params)
+        print_physical_params(analysis, result.params)
         Z = analysis.model.eval(analysis.params, xdata=analysis.xdata)
         R = Z - analysis.contours_image.ravel()
         R = R.reshape(analysis.contours_image.shape)
         fig, axs = plt.subplots(1, 2)
         fig.set_size_inches(18.5, 10.5)
-        axs[0].imshow(analysis.image, cmap="gray")
-        axs[1].imshow(R, cmap="gray")
+        axs[0].imshow(analysis.image, cmap="gray", vmin=0, vmax=255)
+        axs[1].imshow(R, cmap="gray", vmin=-255, vmax=255)
         plt.show()
-        break
+
+def print_physical_params(analysis: MetaAnalyzer, params):
+    names = list(params.keys())
+    values = {x:params[x].value for x in names}
+    stderrs = {x:params[x].stderr for x in names}
+    print("---------------------------------------------")
+    print(f"l = {values['l']*analysis.scale} +- {stderrs['l']*analysis.scale} nm")
+    print(f"w = {values['w']*analysis.scale} +- {stderrs['w']*analysis.scale} nm")
+    print(f"px = {values['px']*analysis.scale} +- {stderrs['px']*analysis.scale} nm")
+    print(f"py = {values['py']*analysis.scale} +- {stderrs['py']*analysis.scale} nm")
+    print(f"dx = {values['dx']*analysis.scale} +- {stderrs['dx']*analysis.scale} nm")
+    print(f"dy = {values['dy']*analysis.scale} +- {stderrs['dy']*analysis.scale} nm")
+    print(f"t1 = {values['t1']*180/pi} +- {stderrs['t1']*180/pi} deg")
+    print(f"t2 = {values['t2']*180/pi} +- {stderrs['t2']*180/pi} deg")
+    print("---------------------------------------------")
 
 def test_main():
     # # testing slot main

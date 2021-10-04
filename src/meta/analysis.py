@@ -76,7 +76,7 @@ class MetaAnalyzer:
             def iter_cb(params, iter, resid, *args, **kws):
                 clear_output(wait=True)
                 R = resid.reshape((self.canvas_y, self.canvas_x))
-                plt.imshow(R, cmap="gray")
+                plt.imshow(R, cmap="gray", vmin=-255, vmax=255)
                 plt.show()
                 print(f"iter:\t{iter}")
                 params.pretty_print(colwidth=10, columns=[
