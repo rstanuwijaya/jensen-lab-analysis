@@ -1,6 +1,7 @@
 #%%
 import os
 import time
+from IPython.core.display import clear_output
 import numpy as np
 from math import pi
 import matplotlib.pyplot as plt
@@ -92,6 +93,7 @@ def main():
         print(f"{i} {image}")
     selected_index = 0
     selected_index = int(input("Enter the index of the file to be processed"))
+    clear_output()
     for i, name in enumerate(images):
         if i != selected_index: continue
         path = os.path.join(dirpath, name)
