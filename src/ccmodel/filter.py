@@ -8,7 +8,7 @@ import os
 from numpy.core.einsumfunc import _parse_einsum_input
 import pandas as pd
 
-class filter:
+class Filter:
     filter_heatmap = None
     filter_type = None
     filter_map = dict()

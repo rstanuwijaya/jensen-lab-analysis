@@ -21,7 +21,7 @@ from fast_histogram import histogram1d
 from . import utils
 from . import filter
 
-class time_bin:
+class TimeBin:
     path = None
     name = None
     config = None
