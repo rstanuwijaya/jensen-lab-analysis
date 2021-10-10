@@ -11,11 +11,13 @@ from meta import SlotModel
 
 def main():
     analysis_list = []
-    path = os.path.abspath("/home/stnav/jensen-lab/sample/Align_P300L135_003.tif")
-    canvas_y, canvas_x = 1000, 1500
+    canvas_y, canvas_x = (0, 1000), (0, 1500)
     min_slot_size = 100
     threshold = 40
     scale = 500/277
+    run_fit = True
+    show_iter_output = True
+    max_fit_iter = None
     init_params = {
         'y0': {
             'value': 0,
@@ -28,57 +30,57 @@ def main():
         'py': {
             'value': 180,
             'vary': True,
-            'min': 0
+            'min': 0,
         },
         'px': {
             'value': 183,
             'vary': True,
-            'min': 0
+            'min': 0,
         },
         'dy': {
             'value': 177//4,
             'vary': True,
-            'min': 0
+            'min': 0,
         },
         'dx': {
             'value': 177//4,
             'vary': True,
-            'min': 0
+            'min': 0,
         },
         'l': {
             'value': 200/2,
             'vary': True,
             'min': 0,
-            'max': 177
+            'max': 177,
         },
         'w': {
             'value': 30,
             'vary': True,
             'min': 0,
-            'max': 177/4
+            'max': 177/4,
         },
         'r': {
             'value': 2,
             'vary': True,
-            'min': 0
+            'min': 0,
         },
         't1': {
             'value': 0,
             'vary': True,
             'min': -pi/2,
-            'max': pi/2
+            'max': pi/2,
         },
         't2': {
             'value': 0,
             'vary': True,
             'min': -pi/2,
-            'max': pi/2
+            'max': pi/2,
         },
         'phi': {
             'value': -pi/180*2.5,
             'vary': True,
             'min': -pi/2,
-            'max': pi/2
+            'max': pi/2,
         }
     }
     dirpath = os.path.abspath("/mnt/e/Data/JensenLab/FIBImage/Set1_FIB")
@@ -86,43 +88,24 @@ def main():
     for file in os.listdir(dirpath):
         if file.endswith('.tif'):
             images.append(file)
-    for iter, name in enumerate(images):
-        if iter != 1: continue
-        if not name.endswith(".tif"):
-            continue
+    for i, image in enumerate(images):
+        print(f"{i} {image}")
+    selected_index = 0
+    selected_index = int(input("Enter the index of the file to be processed"))
+    for i, name in enumerate(images):
+        if i != selected_index: continue
         path = os.path.join(dirpath, name)
         name = name.replace("roa", "").replace(".tif", "")
         args = name.split("_")
 
-        analysis = MetaAnalyzer(path=path, canvas=(canvas_y, canvas_x), min_slot_size=min_slot_size, threshold=threshold, init_params=init_params, scale=scale, verbose=True)
-        result = analysis.fit_lattice_lmfit()
-        analysis_list.append(analysis)
-        print(result.fit_report())
-        # print(result.params)
-        print_physical_params(analysis, result.params)
-        Z = analysis.model.eval(analysis.params, xdata=analysis.xdata)
-        R = Z - analysis.contours_image.ravel()
-        R = R.reshape(analysis.contours_image.shape)
-        fig, axs = plt.subplots(1, 2)
-        fig.set_size_inches(18.5, 10.5)
-        axs[0].imshow(analysis.image, cmap="gray", vmin=0, vmax=255)
-        axs[1].imshow(R, cmap="gray", vmin=-255, vmax=255)
-        plt.show()
-
-def print_physical_params(analysis: MetaAnalyzer, params):
-    names = list(params.keys())
-    values = {x:params[x].value for x in names}
-    stderrs = {x:params[x].stderr for x in names}
-    print("---------------------------------------------")
-    print(f"l = {values['l']*analysis.scale} +- {stderrs['l']*analysis.scale} nm")
-    print(f"w = {values['w']*analysis.scale} +- {stderrs['w']*analysis.scale} nm")
-    print(f"px = {values['px']*analysis.scale} +- {stderrs['px']*analysis.scale} nm")
-    print(f"py = {values['py']*analysis.scale} +- {stderrs['py']*analysis.scale} nm")
-    print(f"dx = {values['dx']*analysis.scale} +- {stderrs['dx']*analysis.scale} nm")
-    print(f"dy = {values['dy']*analysis.scale} +- {stderrs['dy']*analysis.scale} nm")
-    print(f"t1 = {values['t1']*180/pi} +- {stderrs['t1']*180/pi} deg")
-    print(f"t2 = {values['t2']*180/pi} +- {stderrs['t2']*180/pi} deg")
-    print("---------------------------------------------")
+        analysis = MetaAnalyzer(path=path, canvas=(canvas_y, canvas_x), min_slot_size=min_slot_size, threshold=threshold, init_params=init_params, scale=scale, verbose=show_iter_output, max_fit_iter=max_fit_iter)
+        if run_fit:
+            result = analysis.fit_lattice_lmfit()
+            analysis_list.append(analysis)
+            print(result.fit_report())
+            analysis.print_physical_params(result.params)
+        analysis.plot_matplotlib()
+        # analysis.plot_plotly()
 
 def test_main():
     # # testing slot main
