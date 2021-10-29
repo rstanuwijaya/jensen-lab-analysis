@@ -31,16 +31,12 @@ def generate_filter(shape):
     return np.random.choice(2, shape, p=weights)
 
 
-def generate_filter_permute(shape, input):
-    return np.random.shuffle(input)
-
-
 def run_iteration():
     obj = generate_object()
     list_pairs = []
     G2 = np.zeros(obj.shape)
     N = 10000
-    p1 = 0.0001
+    p1 = 0.001
     ns = obj.shape[0]*obj.shape[1]
     n1 = math.ceil(ns*p1)
     print('passing pixels:', n1)
@@ -51,8 +47,7 @@ def run_iteration():
             print('\r', i, end='')
         np.random.shuffle(input)
         Si = input.reshape(obj.shape)
-        # Ii = np.sum(np.logical_and(T, Si).flatten())
-        Ii = np.sum(T[Si > 0].flatten())
+        Ii = np.sum((T*Si).flatten())
         G2 += Si*Ii
         pair = (Si, Ii)
         # list_pairs.append(pair)
