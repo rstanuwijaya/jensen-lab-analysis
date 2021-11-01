@@ -1,11 +1,11 @@
 #%%
-import numpy as np
+import os
 import math
+import numpy as np
 import matplotlib.pyplot as plt
 from numpy.core.numeric import full
 # from scipy.optimize import curve_fit
 import lmfit
-import os
 import time
 import importlib
 import pandas
@@ -21,6 +21,8 @@ class RunFit:
         self.test_fit = test_fit
         self.debug = debug
         self.iter = 1
+        self.result = None
+        self.fit_params = None
 
         self.read_file()
         self.init_fit()
@@ -52,7 +54,7 @@ class RunFit:
     def run_fit(self):
         self.result = self.model.fit(self.ydata, self.params, x=self.xdata)
         print(self.result.fit_report())
-        plt.figure(figsize=(20,30))
+        plt.figure(figsize=(20,15))
         self.result.plot_fit(datafmt='o')
         plt.show()
         self.fit_params = self.result.params
