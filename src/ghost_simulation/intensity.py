@@ -17,7 +17,7 @@ def generate_object():
     ])
 
 
-def generate_object():
+def generate_object2():
     size = (50, 50)
     img = Image.open('RC_200.png').resize(
         size, Image.ANTIALIAS).convert('L')
@@ -25,21 +25,17 @@ def generate_object():
     return img
 
 
-def generate_filter(shape):
-    p1 = 0.01
-    weights = (1-p1, p1)
-    return np.random.choice(2, shape, p=weights)
 
-
-def run_iteration():
+def run_iteration(p1, m):
     obj = generate_object()
-    list_pairs = []
     G2 = np.zeros(obj.shape)
-    N = 10000
-    p1 = 0.001
     ns = obj.shape[0]*obj.shape[1]
+    p1 = p1
+    N = ns*m
     n1 = math.ceil(ns*p1)
+    print('N:', N)
     print('passing pixels:', n1)
+    print('p1:', p1)
     input = np.array([1 if i < n1 else 0 for i in range(ns)])
     T = obj
     for i in range(N):
@@ -49,18 +45,22 @@ def run_iteration():
         Si = input.reshape(obj.shape)
         Ii = np.sum((T*Si).flatten())
         G2 += Si*Ii
-        pair = (Si, Ii)
-        # list_pairs.append(pair)
-    # G2 = 1/N * sum([(Si*Ii) for (Si, Ii) in list_pairs])
     G2 = 1/N * G2
+    plt.figure(figsize=(5,5))
     plt.imshow(obj, cmap='gray')
-    plt.show()
-    plt.imshow(G2, cmap='gray')
+    plt.savefig('../out/init2.png')
+    # plt.show()
+    plt.figure(figsize=(5,5))
+    plt.imshow(G2, cmap='gray', vmin=0)
+    plt.title(f'p1 = {p1}, N = {N}')
+    plt.savefig(f'../out/sim2_p1={p1}_N={N}.png')
     plt.show()
 
 
 def main():
-    run_iteration()
+    for p1 in (0.01, 0.05, 0.1):
+        for m in (1, 5, 10, 50, 100):
+            run_iteration(p1, m)
 
 
 if __name__ == '__main__':
