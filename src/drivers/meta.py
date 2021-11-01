@@ -13,7 +13,7 @@ from meta import SlotModel
 def main():
     analysis_list = []
     canvas_y, canvas_x = (0, 1000), (0, 1500)
-    min_slot_size = 100
+    min_slot_size = 50
     threshold = 40
     scale = 500/277
     run_fit = True
@@ -84,14 +84,14 @@ def main():
             'max': pi/2,
         }
     }
-    dirpath = os.path.abspath("/mnt/e/Data/JensenLab/FIBImage/Set1_FIB")
+    dirpath = os.path.abspath("/mnt/e/Data/JensenLab/FIBImage/Set1_FIB_ellipse")
     images = []
     for file in os.listdir(dirpath):
         if file.endswith('.tif'):
             images.append(file)
     for i, image in enumerate(images):
         print(f"{i} {image}")
-    selected_index = 0
+    # selected_index = 0
     selected_index = int(input("Enter the index of the file to be processed"))
     clear_output()
     for i, name in enumerate(images):
@@ -115,31 +115,44 @@ def test_main():
     ax = fig.gca()
     x = np.linspace(-10, 10, 1000)
     y = np.linspace(-10, 10, 1000)
-    z = SlotModel.gaussian_flat(x, mu=0, w=4, s=0.2)
+    mu, w, s = 0, 4, 0.8
+    z = SlotModel.gaussian_flat(x, mu=mu, w=w, s=s)
+    np.savetxt(f'out/meta_gaussianFlat_x_mu={mu}-w={w}-s={s}.csv', x)
+    np.savetxt(f'out/meta_gaussianFlat_z_mu={mu}-w={w}-s={s}.csv', z)
     ax.plot(x, z)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
     X, Y = np.meshgrid(x, y)
-    Z = SlotModel.gaussian_slot(Y, X, cy=0, cx=0, t=0, l=4, w=2, r=0.2)
+    l, w, r = 4, 2, 0.2
+    Z = SlotModel.gaussian_slot(Y, X, cy=0, cx=0, t=0, l=l, w=w, r=r)
+    np.savetxt(f'out/meta_gaussianSlot_z_l={mu}-w={w}-r={r}.csv', Z)
     fig.suptitle("Gaussian Slot")
     # ax.plot_surface(X, Y, Z)
     ax.imshow(Z)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
+    x = np.linspace(0, 10, 1000)
+    y = np.linspace(0, 10, 1000)
     X, Y = np.meshgrid(x, y)
-    Z = SlotModel.gaussian_cell(Y, X, my=0, mx=0, py=10, px=10, t1=0, t2=0, dy=2.5, dx=2.5, l=4, w=2, r=0.2)
+    dx, dy = 2.5, 2.5,
+    t1, t2 = 0, pi/6 
+    Z = SlotModel.gaussian_cell(Y, X, my=5, mx=5, py=10, px=10, t1=t1, t2=t2, dy=dy, dx=dx, l=4, w=2, r=0.2)
+    np.savetxt(f'out/meta_gaussianCell_z_t1={t1}-t2={t2}dx={dx}-dy={dy}.csv', Z)
     fig.suptitle("Slot Cell")
     # ax.plot_surface(X, Y, Z)
     ax.imshow(Z)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    x = np.linspace(-10, 10, 3000)
-    y = np.linspace(-10, 10, 2000)
+    x = np.linspace(0, 60, 1500)
+    y = np.linspace(0, 40, 1000)
     X, Y = np.meshgrid(x, y)
-    Z = SlotModel.gaussian_lattice(Y, X, y0=0, x0=0, phi=pi/6/4, py=10, px=10, t1=0, t2=0, dy=2.5, dx=2.5, l=4, w=2, r=0.2)
+    dx, dy = 2.5, 2.5,
+    t1, t2 = 0, pi/6 
+    Z = SlotModel.gaussian_lattice(Y, X, y0=0, x0=0, phi=pi/6/4, py=10, px=10, t1=t1, t2=t2, dy=dy, dx=dx, l=4, w=2, r=0.2)
+    np.savetxt(f'out/meta_gaussianLattice_z_t1={t1}-t2={t2}dx={dx}-dy={dy}.csv', Z)
     fig.suptitle("Slot lattice")
     # ax.plot_surface(X, Y, Z)
     ax.imshow(Z)

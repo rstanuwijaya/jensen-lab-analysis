@@ -57,6 +57,8 @@ class MetaAnalyzer:
         contours = [c for c in contours if c.shape[0] > min_size]
         for c in contours:
             cv2.drawContours(cnt_img, [c], -1, 255, -1)
+        # plt.imshow(img + cnt_img, cmap='gray')
+        # plt.show()
         return contours, cnt_img
 
     def init_lmfit(self):
@@ -66,7 +68,7 @@ class MetaAnalyzer:
         Y, X = Y.ravel(), X.ravel()
         self.xdata = np.vstack((Y, X))
         self.ydata = self.contours_image.flatten()
-        self.model = lmfit.Model(SlotModel.gaussian_fit, name="Slot Model")
+        self.model = lmfit.Model(SlotModel.gaussian_fit, name=self.name)
         default_hint = {'value': 1, 'min': -inf,
                         'max': inf, 'vary': False, 'expr': None}
         for param_name in self.model.param_names:
