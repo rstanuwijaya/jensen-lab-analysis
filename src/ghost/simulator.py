@@ -8,12 +8,36 @@ from PIL import Image
 class PathGenerator:
     def zigzag(shape, n):
         R = np.zeros(shape, dtype=bool)
-        L = []
+        L = dict()
         for i in range(shape[0] * shape[1]):
             u, v = i // shape[1], i % shape[1]
-            L.append((u,v))
-        L = sorted(L, key=lambda x: (x[0] + x[1], x[0]))
-        for i, (u, v) in enumerate(L):
+            r, t = u + v, u
+            L[(u,v)] = (r,t)
+        L = {k: v for k, v in sorted(L.items(), key=lambda x: (x[1][0], x[1][1]))}
+        for i, (u, v) in enumerate(L.keys()):
+            if i < n: R[u, v] = True
+        return R
+    def circular(shape, n):
+        R = np.zeros(shape, dtype=bool)
+        L = dict()
+        for i in range(shape[0] * shape[1]):
+            u, v = i // shape[1], i % shape[1]
+            r, t = math.sqrt(u**2 + v**2), math.atan2(u, v)
+            L[(u,v)] = (r,t)
+        L = {k: v for k, v in sorted(L.items(), key=lambda x: (x[1][0], x[1][1]))}
+        for i, (u, v) in enumerate(L.keys()):
+            if i < n: R[u, v] = True
+        return R
+    def square(shape, n):
+        R = np.zeros(shape, dtype=bool)
+        L = dict()
+        for i in range(shape[0] * shape[1]):
+            u, v = i // shape[1], i % shape[1]
+            r = max(u, v)
+            t = v if u < v else u + v
+            L[(u,v)] = (r,t)
+        L = {k: v for k, v in sorted(L.items(), key=lambda x: (x[1][0], x[1][1]))}
+        for i, (u, v) in enumerate(L.keys()):
             if i < n: R[u, v] = True
         return R
 
@@ -26,15 +50,14 @@ class GhostSimulator:
         self.h = self.generate_hadamard(self.shape)
         self.R = None
         self.I = None
-        self.F = None
         self.G2 = None
 
         self.reset_vars()
         
     def reset_vars(self):
         self.R = np.zeros(self.shape)
-        self.I = np.zeros(self.shape)
-        self.F = np.zeros(self.shape)
+        self.I = np.empty(self.shape)
+        self.I[:] = np.nan
         self.G2 = np.zeros(self.shape)
         
     def generate_image_from_file(self, path):
@@ -45,6 +68,9 @@ class GhostSimulator:
     
     @staticmethod
     def generate_hadamard(shape):
+        '''
+        generate Hadamard matrix of size shape with
+        '''
         order = math.ceil(math.log(max(shape[0], shape[1]), 2))
         h = np.array([[1, 1], [1, -1]])
         for i in range(order-1):
@@ -66,7 +92,11 @@ class GhostSimulator:
         cnt = 0
         if self.method == 'zigzag':
             self.R = PathGenerator.zigzag(self.shape, self.num_filters)
-
+        elif self.method == 'circular':
+            self.R = PathGenerator.circular(self.shape, self.num_filters)
+        elif self.method == 'square':
+            self.R = PathGenerator.square(self.shape, self.num_filters)
+        
         for i in range(self.shape[0] * self.shape[1]):
             u, v = i // self.shape[1], i % self.shape[1]
             if not self.R[u, v]: continue
@@ -74,7 +104,6 @@ class GhostSimulator:
             Hi = self.generate_filter(self.h, u, v)
             Ii = np.sum((self.T*Hi).flatten())
             self.I[u, v] = Ii
-            self.F[u, v] = np.abs(Ii)
             self.G2 += Hi*Ii
         
         self.G2 = self.G2 / (self.shape[0] * self.shape[1])
