@@ -17,6 +17,7 @@ class PathGenerator:
         L = {k: v for k, v in sorted(L.items(), key=lambda x: (x[1][0], x[1][1]))}
         for i, (u, v) in enumerate(L.keys()):
             if i < n: R[u, v] = True
+        R[0, 0] = True
         return R
     def circular(shape, n):
         R = np.zeros(shape, dtype=bool)
@@ -62,13 +63,12 @@ class GhostSimulator:
         self.G2 = np.zeros(self.slm_res)
         
     def generate_image_from_file(self, path):
-        img = Image.open('../common/cat.png').resize(
+        img = Image.open(path).resize(
             (self.slm_res[1], self.slm_res[0]), Image.ANTIALIAS).convert('L')
         img = np.asarray(img)
         return img
     
-    @staticmethod
-    def generate_hadamard(shape):
+    def generate_hadamard(self, shape):
         '''
         generate Hadamard matrix of size shape with
         '''

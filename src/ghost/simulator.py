@@ -61,7 +61,7 @@ class GhostSimulator:
         self.G2 = np.zeros(self.shape)
         
     def generate_image_from_file(self, path):
-        img = Image.open('../common/cat.png').resize(
+        img = Image.open(path).resize(
             (self.shape[1], self.shape[0]), Image.ANTIALIAS).convert('L')
         img = np.asarray(img)
         return img

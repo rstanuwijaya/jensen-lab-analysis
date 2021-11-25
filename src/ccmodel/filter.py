@@ -53,7 +53,7 @@ class Filter:
         bottom = bottom if bottom != -1 else n_px
         right = right if right != -1 else n_px
 
-        blank_image[up-1:bottom, left-1:right] = True
+        blank_image[up:bottom, left:right] = True
         return blank_image
 
     def create_base_filter(self) -> np.ndarray:
@@ -132,6 +132,16 @@ class Filter:
         bright_filter = bright_filter & base_filter
 
         return bright_filter
+
+    def create_select_filter(self) -> np.ndarray:
+        base_filter = self.create_base_filter()
+        
+
+        bright_filter = flatten_bright & flatten_bright.transpose()
+        bright_filter = bright_filter & base_filter
+
+        return bright_filter
+
 
     def get_bright_image_model(self):
         image_model = self.load_image_model()
