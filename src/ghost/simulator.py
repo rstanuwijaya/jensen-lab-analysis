@@ -111,3 +111,6 @@ class GhostSimulator:
     
     def calc_rmse(self):
         return math.sqrt(np.sum((self.T - self.G2)**2) / (self.shape[0] * self.shape[1]))
+    def calc_psnr(self):
+        if self.calc_rmse() == 0: return math.inf
+        return 20*math.log10(255/self.calc_rmse())
