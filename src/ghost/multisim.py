@@ -49,8 +49,8 @@ class GhostSimulator:
         self.num_filters = num_filters
         self.method = method
         self.T = self.generate_image_from_file(path) # flattened image
-        self.h = self.generate_hadamard(self.shape_mac)
-        self.A = self.generate_cali_matrix()
+        self.h = self.generate_hadamard(self.shape_mac) # 2d hadamard matrix
+        self.A = self.generate_cali_matrix() #
         self.R = None
         self.I = None
         self.G2 = None
