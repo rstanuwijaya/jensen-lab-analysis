@@ -129,9 +129,9 @@ class GhostSimulator:
             if not self.R[u, v]: continue
             k += 1
             Sk = self.generate_filter(i).flatten()    
-            Ik = (Tk*Sk) @ self.A
-            self.I[i, :] = Ik
-            G2 += Ik @ self.A.T * Sk
+            Ik = self.A.T @ (Tk*Sk) 
+            self.I[i, :] = Ik.T
+            G2 += (self.A @ Ik) * Sk
         
         G2 = G2 / prod(self.shape_mac)
         self.G2 = G2.reshape(self.shape_slm)
