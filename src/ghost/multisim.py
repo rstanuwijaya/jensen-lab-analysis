@@ -48,12 +48,12 @@ class GhostSimulator:
         self.shape_mac = (ceil(shape_slm[0] // shape_cam[0]), ceil(shape_slm[1] // shape_cam[1])) # macro pixel shape
         self.num_filters = num_filters
         self.method = method
-        self.T = self.generate_image_from_file(path) # flattened image
+        self.T = self.generate_image_from_file(path) # 2d target image
         self.h = self.generate_hadamard(self.shape_mac) # 2d hadamard matrix
         self.A = self.generate_cali_matrix() #
         self.R = None
         self.I = None
-        self.G2 = None
+        self.G2 = None # 2d reconstructed image
 
         self.reset_vars()
         
@@ -71,9 +71,6 @@ class GhostSimulator:
             slm[u, v] = 1
             cam = cv2.resize(slm, self.shape_cam, interpolation=cv2.INTER_AREA)
             cam = cam * prod(self.shape_slm) / prod(self.shape_cam)
-            if i == 0:
-                plt.imshow(cam)
-                plt.plot()
             A[i, :] = cam.flatten()
         return A
 
@@ -81,7 +78,6 @@ class GhostSimulator:
         img = Image.open(path).resize(
             (self.shape_slm[1], self.shape_slm[0]), Image.ANTIALIAS).convert('L')
         img = np.asarray(img)
-        img = img.flatten()
         return img
     
     @staticmethod
@@ -118,7 +114,7 @@ class GhostSimulator:
 
     def run_simulation(self):
         self.reset_vars()
-        cnt = 0
+        k = 0 # count of filters
         G2 = np.zeros(prod(self.shape_slm))
         if self.method == 'zigzag':
             self.R = PathGenerator.zigzag(self.shape_mac, self.num_filters)
@@ -127,19 +123,19 @@ class GhostSimulator:
         elif self.method == 'square':
             self.R = PathGenerator.square(self.shape_mac, self.num_filters)
 
+        Tk = self.T.flatten()
         for i in range(self.shape_mac[0] * self.shape_mac[1]):
             u, v = i // self.shape_mac[1], i % self.shape_mac[1]
             if not self.R[u, v]: continue
-            cnt += 1
-            Si = self.generate_filter(i).flatten()
-            Ti = self.T.flatten()
-            Ii = (Ti*Si) @ self.A
-            self.I[i, :] = Ii
-            G2 += Ii @ self.A.T * Si
+            k += 1
+            Sk = self.generate_filter(i).flatten()    
+            Ik = (Tk*Sk) @ self.A
+            self.I[i, :] = Ik
+            G2 += Ik @ self.A.T * Sk
         
-        G2 = G2 / cnt
+        G2 = G2 / prod(self.shape_mac)
         self.G2 = G2.reshape(self.shape_slm)
-        return cnt
+        return k
     
     def calc_rmse(self):
         return sqrt(np.sum((self.T - self.G2)**2) / (self.shape_slm[0] * self.shape_slm[1]))
