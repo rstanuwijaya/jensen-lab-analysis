@@ -61,15 +61,15 @@ class GhostSimulator:
         
     def reset_vars(self):
         if self.sigma == 0:
-            self.A = self.generate_cali_matrix() 
+            self.A = self.generate_cali_matrix_ideal() 
         else:
-            self.A, self.At = self.generate_cali_matrix2()
+            self.A, self.At = self.generate_cali_matrix_gaussian()
         self.R = np.zeros(self.shape_mac)
         self.I = np.empty((prod(self.shape_mac), prod(self.shape_cam)))
         self.I[:] = np.nan
         self.G2 = np.zeros(self.shape_slm)
     
-    def generate_cali_matrix(self):
+    def generate_cali_matrix_ideal(self):
         A = np.zeros((prod(self.shape_slm), prod(self.shape_cam)))
         for i in range(prod(self.shape_slm)):
             u, v = i // self.shape_slm[1], i % self.shape_slm[1]
@@ -80,7 +80,7 @@ class GhostSimulator:
             A[i, :] = cam.flatten()
         return A
 
-    def generate_cali_matrix2(self):
+    def generate_cali_matrix_gaussian(self):
         cam_res = self.shape_cam
         slm_res = self.shape_slm
         mac_res = self.shape_mac
