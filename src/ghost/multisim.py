@@ -6,6 +6,7 @@ import os
 from PIL import Image
 import cv2
 
+
 class PathGenerator:
     def zigzag(shape, n):
         R = np.zeros(shape, dtype=bool)
@@ -13,22 +14,28 @@ class PathGenerator:
         for i in range(shape[0] * shape[1]):
             u, v = i // shape[1], i % shape[1]
             r, t = u + v, u
-            L[(u,v)] = (r,t)
-        L = {k: v for k, v in sorted(L.items(), key=lambda x: (x[1][0], x[1][1]))}
+            L[(u, v)] = (r, t)
+        L = {k: v for k, v in sorted(
+            L.items(), key=lambda x: (x[1][0], x[1][1]))}
         for i, (u, v) in enumerate(L.keys()):
-            if i < n: R[u, v] = True
+            if i < n:
+                R[u, v] = True
         return R
+
     def circular(shape, n):
         R = np.zeros(shape, dtype=bool)
         L = dict()
         for i in range(shape[0] * shape[1]):
             u, v = i // shape[1], i % shape[1]
             r, t = sqrt(u**2 + v**2), atan2(u, v)
-            L[(u,v)] = (r,t)
-        L = {k: v for k, v in sorted(L.items(), key=lambda x: (x[1][0], x[1][1]))}
+            L[(u, v)] = (r, t)
+        L = {k: v for k, v in sorted(
+            L.items(), key=lambda x: (x[1][0], x[1][1]))}
         for i, (u, v) in enumerate(L.keys()):
-            if i < n: R[u, v] = True
+            if i < n:
+                R[u, v] = True
         return R
+
     def square(shape, n):
         R = np.zeros(shape, dtype=bool)
         L = dict()
@@ -36,39 +43,43 @@ class PathGenerator:
             u, v = i // shape[1], i % shape[1]
             r = max(u, v)
             t = v if u < v else u + v
-            L[(u,v)] = (r,t)
-        L = {k: v for k, v in sorted(L.items(), key=lambda x: (x[1][0], x[1][1]))}
+            L[(u, v)] = (r, t)
+        L = {k: v for k, v in sorted(
+            L.items(), key=lambda x: (x[1][0], x[1][1]))}
         for i, (u, v) in enumerate(L.keys()):
-            if i < n: R[u, v] = True
+            if i < n:
+                R[u, v] = True
         return R
+
+
 class GhostSimulator:
     def __init__(self, path, shape_slm, shape_cam, shape_mac, num_filters, sigma=0, method='zigzag'):
-        self.shape_slm = shape_slm # SLM resolution
-        self.shape_cam = shape_cam # camera resolution
-        self.shape_mac = shape_mac # macro pixel shape
+        self.shape_slm = shape_slm  # SLM resolution
+        self.shape_cam = shape_cam  # camera resolution
+        self.shape_mac = shape_mac  # macro pixel shape
         self.sigma = sigma
         self.num_filters = num_filters
         self.method = method
-        self.T = self.generate_image_from_file(path) # 2d target image
-        self.h = self.generate_hadamard(self.shape_mac) # 2d hadamard matrix
-        self.A = None 
+        self.T = self.generate_image_from_file(path)  # 2d target image
+        self.h = self.generate_hadamard(self.shape_mac)  # 2d hadamard matrix
+        self.A = None
         self.At = None
         self.R = None
         self.I = None
-        self.G2 = None # 2d reconstructed image
+        self.G2 = None  # 2d reconstructed image
 
         self.reset_vars()
-        
+
     def reset_vars(self):
         if self.sigma == 0:
-            self.A = self.generate_cali_matrix_ideal() 
+            self.A = self.generate_cali_matrix_ideal()
         else:
             self.A, self.At = self.generate_cali_matrix_gaussian()
         self.R = np.zeros(self.shape_mac)
         self.I = np.empty((prod(self.shape_mac), prod(self.shape_cam)))
         self.I[:] = np.nan
         self.G2 = np.zeros(self.shape_slm)
-    
+
     def generate_cali_matrix_ideal(self):
         A = np.zeros((prod(self.shape_slm), prod(self.shape_cam)))
         for i in range(prod(self.shape_slm)):
@@ -87,13 +98,13 @@ class GhostSimulator:
         sigma = self.sigma
         At = np.zeros((prod(cam_res), prod(slm_res)))
         for i in range(prod(cam_res)):
-                u, v = i // cam_res[1], i % cam_res[1]
-                x = np.arange(0, slm_res[0], 1)
-                y = np.arange(0, slm_res[1], 1)
-                xv, yv = np.meshgrid(x, y)
-                xy = (xv - (u+0.5)*mac_res[0])**2 + (yv - (v+0.5)*mac_res[1])**2
-                temp = 1/(2*np.pi*sigma**2)*np.exp(-xy/(2*sigma**2))
-                At[i] = temp.flatten()
+            u, v = i // cam_res[1], i % cam_res[1]
+            x = np.arange(0, slm_res[0], 1)
+            y = np.arange(0, slm_res[1], 1)
+            xv, yv = np.meshgrid(x, y)
+            xy = (xv - (u+0.5)*mac_res[0])**2 + (yv - (v+0.5)*mac_res[1])**2
+            temp = 1/(2*np.pi*sigma**2)*np.exp(-xy/(2*sigma**2))
+            At[i] = temp.flatten()
         S = At.T.sum(axis=1, keepdims=True)
         A = At.T/S
 
@@ -104,7 +115,7 @@ class GhostSimulator:
             (self.shape_slm[1], self.shape_slm[0]), Image.ANTIALIAS).convert('L')
         img = np.asarray(img)
         return img
-    
+
     @staticmethod
     def generate_hadamard(shape):
         '''
@@ -114,7 +125,7 @@ class GhostSimulator:
         h = np.array([[1, 1], [1, -1]])
         for i in range(order-1):
             h = np.kron(h, np.array([[1, 1], [1, -1]]))
-        
+
         # sort hadamard by frequency
         def calculate_flip(H):
             return sum([H[i] != H[i+1] for i in range(H.shape[0]-1)])
@@ -127,20 +138,21 @@ class GhostSimulator:
         # generate filter for one camera pixel
         u, v = i // self.shape_mac[1], i % self.shape_mac[1]
         h = self.h
-        S = h[:,[v]] @ h[[u], :]
+        S = h[:, [v]] @ h[[u], :]
         return S
 
     def generate_filter(self, i):
         # tiled filter
         Si = self.generate_partial_filter(i)
-        shape = ceil(self.shape_slm[0] / self.shape_mac[0]), ceil(self.shape_slm[1] / self.shape_mac[1])
+        shape = ceil(self.shape_slm[0] / self.shape_mac[0]
+                     ), ceil(self.shape_slm[1] / self.shape_mac[1])
         Si = np.tile(Si, shape)
         Si = Si[:self.shape_slm[0], :self.shape_slm[1]]
         return Si
 
     def run_simulation(self):
         self.reset_vars()
-        k = 0 # count of filters
+        k = 0  # count of filters
         G2 = np.zeros(prod(self.shape_slm))
         if self.method == 'zigzag':
             self.R = PathGenerator.zigzag(self.shape_mac, self.num_filters)
@@ -152,23 +164,26 @@ class GhostSimulator:
         Tk = self.T.flatten()
         for i in range(self.shape_mac[0] * self.shape_mac[1]):
             u, v = i // self.shape_mac[1], i % self.shape_mac[1]
-            if not self.R[u, v]: continue
+            if not self.R[u, v]:
+                continue
             k += 1
             Sk = self.generate_filter(i).flatten()  # generate filter pattern
 
             # simulate measurement
-            Ik = self.A.T @ (Tk*Sk) 
-            self.I[i, :] = Ik.T # store to the intensity matrix
+            Ik = self.A.T @ (Tk*Sk)
+            self.I[i, :] = Ik.T  # store to the intensity matrix
 
             # reconstruct image
             G2 += (self.A @ Ik) * Sk
-        
+
         G2 = G2 / prod(self.shape_mac)
         self.G2 = G2.reshape(self.shape_slm)
         return k
-    
+
     def calc_rmse(self):
         return sqrt(np.sum((self.T - self.G2)**2) / (self.shape_slm[0] * self.shape_slm[1]))
+
     def calc_psnr(self):
-        if self.calc_rmse() == 0: return inf
+        if self.calc_rmse() == 0:
+            return inf
         return 20*log10(255/self.calc_rmse())
