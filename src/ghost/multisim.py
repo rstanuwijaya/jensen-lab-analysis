@@ -42,15 +42,17 @@ class PathGenerator:
             if i < n: R[u, v] = True
         return R
 class GhostSimulator:
-    def __init__(self, path, shape_slm, shape_cam, num_filters, method='zigzag'):
+    def __init__(self, path, shape_slm, shape_cam, shape_mac, num_filters, sigma=0, method='zigzag'):
         self.shape_slm = shape_slm # SLM resolution
         self.shape_cam = shape_cam # camera resolution
-        self.shape_mac = (ceil(shape_slm[0] // shape_cam[0]), ceil(shape_slm[1] // shape_cam[1])) # macro pixel shape
+        self.shape_mac = shape_mac # macro pixel shape
+        self.sigma = sigma
         self.num_filters = num_filters
         self.method = method
         self.T = self.generate_image_from_file(path) # 2d target image
         self.h = self.generate_hadamard(self.shape_mac) # 2d hadamard matrix
-        self.A = self.generate_cali_matrix() #
+        self.A = None 
+        self.At = None
         self.R = None
         self.I = None
         self.G2 = None # 2d reconstructed image
@@ -58,6 +60,10 @@ class GhostSimulator:
         self.reset_vars()
         
     def reset_vars(self):
+        if self.sigma == 0:
+            self.A = self.generate_cali_matrix() 
+        else:
+            self.A, self.At = self.generate_cali_matrix2()
         self.R = np.zeros(self.shape_mac)
         self.I = np.empty((prod(self.shape_mac), prod(self.shape_cam)))
         self.I[:] = np.nan
@@ -73,6 +79,25 @@ class GhostSimulator:
             cam = cam * prod(self.shape_slm) / prod(self.shape_cam)
             A[i, :] = cam.flatten()
         return A
+
+    def generate_cali_matrix2(self):
+        cam_res = self.shape_cam
+        slm_res = self.shape_slm
+        mac_res = self.shape_mac
+        sigma = self.sigma
+        At = np.zeros((prod(cam_res), prod(slm_res)))
+        for i in range(prod(cam_res)):
+                u, v = i // cam_res[1], i % cam_res[1]
+                x = np.arange(0, slm_res[0], 1)
+                y = np.arange(0, slm_res[1], 1)
+                xv, yv = np.meshgrid(x, y)
+                xy = (xv - (u+0.5)*mac_res[0])**2 + (yv - (v+0.5)*mac_res[1])**2
+                temp = 1/(2*np.pi*sigma**2)*np.exp(-xy/(2*sigma**2))
+                At[i] = temp.flatten()
+        S = At.T.sum(axis=1, keepdims=True)
+        A = At.T/S
+
+        return A, At
 
     def generate_image_from_file(self, path):
         img = Image.open(path).resize(
@@ -108,7 +133,8 @@ class GhostSimulator:
     def generate_filter(self, i):
         # tiled filter
         Si = self.generate_partial_filter(i)
-        Si = np.tile(Si, self.shape_cam)
+        shape = ceil(self.shape_slm[0] / self.shape_mac[0]), ceil(self.shape_slm[1] / self.shape_mac[1])
+        Si = np.tile(Si, shape)
         Si = Si[:self.shape_slm[0], :self.shape_slm[1]]
         return Si
 
@@ -128,9 +154,13 @@ class GhostSimulator:
             u, v = i // self.shape_mac[1], i % self.shape_mac[1]
             if not self.R[u, v]: continue
             k += 1
-            Sk = self.generate_filter(i).flatten()    
+            Sk = self.generate_filter(i).flatten()  # generate filter pattern
+
+            # simulate measurement
             Ik = self.A.T @ (Tk*Sk) 
-            self.I[i, :] = Ik.T
+            self.I[i, :] = Ik.T # store to the intensity matrix
+
+            # reconstruct image
             G2 += (self.A @ Ik) * Sk
         
         G2 = G2 / prod(self.shape_mac)
