@@ -102,7 +102,7 @@ class GhostSimulator:
             x = np.arange(0, slm_res[0], 1)
             y = np.arange(0, slm_res[1], 1)
             xv, yv = np.meshgrid(x, y)
-            xy = (xv - (u+0.5)*mac_res[0])**2 + (yv - (v+0.5)*mac_res[1])**2
+            xy = (xv - (u+0.5)*mac_res[0] + 0.5)**2 + (yv - (v+0.5)*mac_res[1] + 0.5)**2
             temp = 1/(2*np.pi*sigma**2)*np.exp(-xy/(2*sigma**2))
             At[i] = temp.flatten()
         S = At.T.sum(axis=1, keepdims=True)
