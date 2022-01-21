@@ -53,15 +53,17 @@ class PathGenerator:
 
 
 class GhostSimulator:
-    def __init__(self, path, shape_slm, shape_cam, shape_mac, num_filters, sigma=0, method='zigzag'):
+    def __init__(self, path, shape_slm, shape_cam, shape_mac, num_filters, rot=(0, 0), sigma=0, method='zigzag'):
+        self.path = path
         self.shape_slm = shape_slm  # SLM resolution
         self.shape_cam = shape_cam  # camera resolution
         self.shape_mac = shape_mac  # macro pixel shape
         self.sigma = sigma
         self.num_filters = num_filters
+        self.rot = rot
         self.method = method
-        self.T = self.generate_image_from_file(path)  # 2d target image
-        self.h = self.generate_hadamard(self.shape_mac)  # 2d hadamard matrix
+        self.T = None  # 2d target image
+        self.h = self.generate_hadamard((0, 0))  # 2d hadamard matrix
         self.A = None
         self.At = None
         self.R = None
@@ -116,8 +118,143 @@ class GhostSimulator:
         img = np.asarray(img)
         return img
 
-    @staticmethod
-    def generate_hadamard(shape):
+    def generate_hadamard(self, rot):
+        order = ceil(log(max(self.shape_mac[0], self.shape_mac[1]), 2))
+        h = np.array([[1, 1], [1, -1]])
+        for i in range(order-1):
+            h = np.kron(h, np.array([[1, 1], [1, -1]]))
+
+        # sort hadamard by frequency
+        def calculate_flip(H):
+            return sum([H[i] != H[i+1] for i in range(H.shape[0]-1)])
+
+        h = np.array(sorted(h, key=lambda row: calculate_flip(row)))
+        h = h[:self.shape_mac[0], :self.shape_mac[1]]
+
+        yr, xr = rot
+        h = np.roll(h, xr, axis=1)
+        h = np.roll(h, yr, axis=0)
+
+        return h
+
+    def generate_partial_filter(self, i, rot):
+        # generate filter for one camera pixel
+        u, v = i // self.shape_mac[1], i % self.shape_mac[1]
+        h = self.generate_hadamard(rot)
+        S = h[:, [v]] @ h[[u], :]
+        return S
+
+    def generate_filter(self, i, rot):
+        # tiled filter
+        Si = self.generate_partial_filter(i, rot)
+        shape = ceil(self.shape_slm[0] / self.shape_mac[0]
+                     ), ceil(self.shape_slm[1] / self.shape_mac[1])
+        Si = np.tile(Si, shape)
+        Si = Si[:self.shape_slm[0], :self.shape_slm[1]]
+        return Si
+
+    def run_simulation(self):
+        self.reset_vars()
+        self.T = self.generate_image_from_file(self.path)  # 2d target image
+        k = 0  # count of filters
+        G2 = np.zeros(prod(self.shape_slm))
+        if self.method == 'zigzag':
+            self.R = PathGenerator.zigzag(self.shape_mac, self.num_filters)
+        elif self.method == 'circular':
+            self.R = PathGenerator.circular(self.shape_mac, self.num_filters)
+        elif self.method == 'square':
+            self.R = PathGenerator.square(self.shape_mac, self.num_filters)
+
+        Tk = self.T.flatten()
+        for i in range(self.shape_mac[0] * self.shape_mac[1]):
+            u, v = i // self.shape_mac[1], i % self.shape_mac[1]
+            if not self.R[u, v]:
+                continue
+            k += 1
+            Sk = self.generate_filter(i, self.rot).flatten()  # generate filter pattern
+
+            # simulate measurement
+            Ik = self.A.T @ (Tk*Sk)
+            self.I[i, :] = Ik.T  # store to the intensity matrix
+
+            # reconstruct image
+            Sk = self.generate_filter(i, (0, 0)).flatten()  # generate filter pattern
+            G2 += (self.A @ Ik) * Sk
+
+        G2 = G2 / prod(self.shape_mac)
+        self.G2 = G2.reshape(self.shape_slm)
+        return k
+
+    def calc_rmse(self):
+        return sqrt(np.sum((self.T - self.G2)**2) / (self.shape_slm[0] * self.shape_slm[1]))
+
+    def calc_psnr(self):
+        if self.calc_rmse() == 0:
+            return inf
+        return 20*log10(255/self.calc_rmse())
+
+class GhostAnalyser:
+    def __init__(self, path, shape_slm, shape_cam, shape_mac, crop, num_filters, rot=(0, 0), sigma=0, method='zigzag'):
+        self.path = path
+        self.shape_slm = shape_slm  # SLM resolution
+        self.shape_cam = shape_cam  # camera resolution
+        self.shape_mac = shape_mac  # macro pixel shape
+        self.crop = crop 
+        self.sigma = sigma
+        self.rot = rot
+        self.num_filters = num_filters
+        self.method = method
+        # self.T = self.generate_image_from_file(path)  # 2d target image
+        self.h = self.generate_hadamard(self.shape_mac)  # 2d hadamard matrix
+        self.A = None
+        self.At = None
+        self.R = None
+        self.I = None
+        self.G2 = None  # 2d reconstructed image
+
+        self.reset_vars()
+
+    def reset_vars(self):
+        if self.sigma == 0:
+            self.A = self.generate_cali_matrix_ideal()
+        else:
+            self.A, self.At = self.generate_cali_matrix_gaussian()
+        self.R = np.zeros(self.shape_mac)
+        self.I = np.empty((prod(self.shape_mac), prod(self.shape_cam)))
+        self.I[:] = np.nan
+        self.G2 = np.zeros(self.shape_slm)
+
+    def generate_cali_matrix_ideal(self):
+        A = np.zeros((prod(self.shape_slm), prod(self.shape_cam)))
+        for i in range(prod(self.shape_slm)):
+            u, v = i // self.shape_slm[1], i % self.shape_slm[1]
+            slm = np.zeros(self.shape_slm)
+            slm[u, v] = 1
+            cam = cv2.resize(slm, self.shape_cam, interpolation=cv2.INTER_AREA)
+            cam = cam * prod(self.shape_slm) / prod(self.shape_cam)
+            A[i, :] = cam.flatten()
+        return A
+
+    def generate_cali_matrix_gaussian(self):
+        cam_res = self.shape_cam
+        slm_res = self.shape_slm
+        mac_res = self.shape_mac
+        sigma = self.sigma
+        At = np.zeros((prod(cam_res), prod(slm_res)))
+        for i in range(prod(cam_res)):
+            u, v = i // cam_res[1], i % cam_res[1]
+            x = np.arange(0, slm_res[0], 1)
+            y = np.arange(0, slm_res[1], 1)
+            xv, yv = np.meshgrid(x, y)
+            xy = (xv - (u+0.5)*mac_res[0] + 0.5)**2 + (yv - (v+0.5)*mac_res[1] + 0.5)**2
+            temp = 1/(2*np.pi*sigma**2)*np.exp(-xy/(2*sigma**2))
+            At[i] = temp.flatten()
+        S = At.T.sum(axis=1, keepdims=True)
+        A = At.T/S
+
+        return A, At
+
+    def generate_hadamard(self, shape):
         '''
         generate Hadamard matrix of size shape with
         '''
@@ -132,6 +269,10 @@ class GhostSimulator:
 
         h = np.array(sorted(h, key=lambda row: calculate_flip(row)))
         h = h[:shape[0], :shape[1]]
+
+        yr, xr = self.rot
+        h = np.roll(h, xr, axis=1)
+        h = np.roll(h, yr, axis=0)
         return h
 
     def generate_partial_filter(self, i):
@@ -150,7 +291,7 @@ class GhostSimulator:
         Si = Si[:self.shape_slm[0], :self.shape_slm[1]]
         return Si
 
-    def run_simulation(self):
+    def run_analysis(self):
         self.reset_vars()
         k = 0  # count of filters
         G2 = np.zeros(prod(self.shape_slm))
@@ -161,7 +302,7 @@ class GhostSimulator:
         elif self.method == 'square':
             self.R = PathGenerator.square(self.shape_mac, self.num_filters)
 
-        Tk = self.T.flatten()
+        # Tk = self.T.flatten()
         for i in range(self.shape_mac[0] * self.shape_mac[1]):
             u, v = i // self.shape_mac[1], i % self.shape_mac[1]
             if not self.R[u, v]:
@@ -170,8 +311,15 @@ class GhostSimulator:
             Sk = self.generate_filter(i).flatten()  # generate filter pattern
 
             # simulate measurement
-            Ik = self.A.T @ (Tk*Sk)
-            self.I[i, :] = Ik.T  # store to the intensity matrix
+            # Ik = self.A.T @ (Tk*Sk)
+            # self.I[i, :] = Ik.T  # store to the intensity matrix
+
+            Ik_p = np.loadtxt(self.path + f'{i}p.csv', delimiter=',')
+            Ik_m = np.loadtxt(self.path + f'{i}m.csv', delimiter=',')
+            Ik = Ik_p - Ik_m
+            Ik = Ik[self.crop[0]:self.crop[1], self.crop[2]:self.crop[3]]
+            Ik = cv2.resize(Ik, self.shape_cam, interpolation=cv2.INTER_AREA)
+            Ik = Ik.flatten()
 
             # reconstruct image
             G2 += (self.A @ Ik) * Sk
