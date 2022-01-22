@@ -91,7 +91,7 @@ class GhostSimulator:
             cam = cv2.resize(slm, self.shape_cam, interpolation=cv2.INTER_AREA)
             cam = cam * prod(self.shape_slm) / prod(self.shape_cam)
             A[i, :] = cam.flatten()
-        
+
         S = A.T.sum(axis=1, keepdims=True)
         At = A.T/S
         return A, At
@@ -107,7 +107,8 @@ class GhostSimulator:
             x = np.arange(0, slm_res[0], 1)
             y = np.arange(0, slm_res[1], 1)
             xv, yv = np.meshgrid(x, y)
-            xy = (xv - (u+0.5)*mac_res[0] + 0.5)**2 + (yv - (v+0.5)*mac_res[1] + 0.5)**2
+            xy = (xv - (u+0.5)*mac_res[0] + 0.5)**2 + \
+                (yv - (v+0.5)*mac_res[1] + 0.5)**2
             temp = 1/(2*np.pi*sigma**2)*np.exp(-xy/(2*sigma**2))
             At[i] = temp.flatten()
         S = At.T.sum(axis=1, keepdims=True)
@@ -133,10 +134,6 @@ class GhostSimulator:
 
         h = np.array(sorted(h, key=lambda row: calculate_flip(row)))
         h = h[:self.shape_mac[0], :self.shape_mac[1]]
-
-        # yr, xr = shift
-        # h = np.roll(h, xr, axis=1)
-        # h = np.roll(h, yr, axis=0)
 
         return h
 
@@ -199,9 +196,11 @@ class GhostSimulator:
             return inf
         return 20*log10(255/self.calc_rmse())
 
+
 class GhostAnalyser(GhostSimulator):
     def __init__(self, path, shape_slm, shape_cam, shape_mac, crop, num_filters, shift=(0, 0), sigma=0, method='zigzag'):
-        super().__init__(path, shape_slm, shape_cam, shape_mac, num_filters, shift, sigma, method)
+        super().__init__(path, shape_slm, shape_cam,
+                         shape_mac, num_filters, shift, sigma, method)
         self.crop = crop
 
     def run_simulation(self):
