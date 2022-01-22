@@ -53,14 +53,14 @@ class PathGenerator:
 
 
 class GhostSimulator:
-    def __init__(self, path, shape_slm, shape_cam, shape_mac, num_filters, rot=(0, 0), sigma=0, method='zigzag'):
+    def __init__(self, path, shape_slm, shape_cam, shape_mac, num_filters, shift=(0, 0), sigma=0, method='zigzag'):
         self.path = path
         self.shape_slm = shape_slm  # SLM resolution
         self.shape_cam = shape_cam  # camera resolution
         self.shape_mac = shape_mac  # macro pixel shape
         self.sigma = sigma
         self.num_filters = num_filters
-        self.rot = rot
+        self.shift = shift
         self.method = method
         self.T = None  # 2d target image
         self.h = self.generate_hadamard()  # 2d hadamard matrix
@@ -74,7 +74,7 @@ class GhostSimulator:
 
     def reset_vars(self):
         if self.sigma == 0:
-            self.A = self.generate_cali_matrix_ideal()
+            self.A, self.At = self.generate_cali_matrix_ideal()
         else:
             self.A, self.At = self.generate_cali_matrix_gaussian()
         self.R = np.zeros(self.shape_mac)
@@ -91,7 +91,10 @@ class GhostSimulator:
             cam = cv2.resize(slm, self.shape_cam, interpolation=cv2.INTER_AREA)
             cam = cam * prod(self.shape_slm) / prod(self.shape_cam)
             A[i, :] = cam.flatten()
-        return A
+        
+        S = A.T.sum(axis=1, keepdims=True)
+        At = A.T/S
+        return A, At
 
     def generate_cali_matrix_gaussian(self):
         cam_res = self.shape_cam
@@ -131,7 +134,7 @@ class GhostSimulator:
         h = np.array(sorted(h, key=lambda row: calculate_flip(row)))
         h = h[:self.shape_mac[0], :self.shape_mac[1]]
 
-        # yr, xr = rot
+        # yr, xr = shift
         # h = np.roll(h, xr, axis=1)
         # h = np.roll(h, yr, axis=0)
 
@@ -172,8 +175,8 @@ class GhostSimulator:
                 continue
             k += 1
             Sk = self.generate_filter(i)  # generate filter pattern
-            Sk = np.roll(Sk, self.rot[0], axis=0)
-            Sk = np.roll(Sk, self.rot[1], axis=1)
+            Sk = np.roll(Sk, self.shift[0], axis=0)
+            Sk = np.roll(Sk, self.shift[1], axis=1)
             Sk = Sk.flatten()
 
             # simulate measurement
@@ -197,9 +200,12 @@ class GhostSimulator:
         return 20*log10(255/self.calc_rmse())
 
 class GhostAnalyser(GhostSimulator):
-    def __init__(self, path, shape_slm, shape_cam, shape_mac, crop, num_filters, rot=(0, 0), sigma=0, method='zigzag'):
-        super().__init__(path, shape_slm, shape_cam, shape_mac, num_filters, rot, sigma, method)
+    def __init__(self, path, shape_slm, shape_cam, shape_mac, crop, num_filters, shift=(0, 0), sigma=0, method='zigzag'):
+        super().__init__(path, shape_slm, shape_cam, shape_mac, num_filters, shift, sigma, method)
         self.crop = crop
+
+    def run_simulation(self):
+        raise NotImplementedError("Class not for simulation")
 
     def run_analysis(self):
         self.reset_vars()
@@ -218,15 +224,14 @@ class GhostAnalyser(GhostSimulator):
             if not self.R[u, v]:
                 continue
             k += 1
-            Sk = self.generate_filter(i)  # generate filter pattern
-            Sk = np.roll(Sk, self.rot[0], axis=0)
-            Sk = np.roll(Sk, self.rot[1], axis=1)
+
+            # generate and shift the filter pattern
+            Sk = self.generate_filter(i)
+            Sk = np.roll(Sk, self.shift[0], axis=0)
+            Sk = np.roll(Sk, self.shift[1], axis=1)
             Sk = Sk.flatten()
 
-            # simulate measurement
-            # Ik = self.A.T @ (Tk*Sk)
-            # self.I[i, :] = Ik.T  # store to the intensity matrix
-
+            # difference imaging and resizing
             Ik_p = np.loadtxt(self.path + f'{i}p.csv', delimiter=',')
             Ik_m = np.loadtxt(self.path + f'{i}m.csv', delimiter=',')
             Ik = Ik_p - Ik_m
