@@ -9,4 +9,4 @@ __pycache__
 /dist
 out*
 env
-data*
+/data*
