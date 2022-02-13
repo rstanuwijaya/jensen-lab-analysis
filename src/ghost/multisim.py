@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from math import prod, sqrt, atan2, pi, ceil, log, log10, inf
+from math import floor, prod, sqrt, atan2, pi, ceil, log, log10, inf
 import random
 import os
 from PIL import Image
@@ -153,6 +153,14 @@ class GhostSimulator:
         Si = Si[:self.shape_slm[0], :self.shape_slm[1]]
         return Si
 
+    def generate_single_pass_filter(self, i):
+        # generate filter for one camera pixel
+        u, v = i // self.shape_slm[1], i % self.shape_slm[1]
+        S = np.zeros(self.shape_slm)
+        S[u, v] = 1
+        
+        return S
+
     def run_simulation(self):
         self.reset_vars()
         self.T = self.generate_image_from_file(self.path)  # 2d target image
@@ -244,3 +252,60 @@ class GhostAnalyser(GhostSimulator):
         G2 = G2 / prod(self.shape_mac)
         self.G2 = G2.reshape(self.shape_slm)
         return k
+
+
+class SLMPattern:
+    def __init__(self, lens_size, slm_res, k, theta):
+        self.lens_size = lens_size
+        self.slm_res = slm_res
+        self.xp_size = ceil(slm_res[0] / lens_size)
+        self.yp_size = ceil(slm_res[1] / lens_size)
+        self.k = k
+        self.theta = theta
+
+    def generate_pattern_grad(self, amp_pattern, ph_pattern):
+        k, theta = self.k, self.theta
+        lens_size = self.lens_size
+        xp_size, yp_size = self.xp_size, self.yp_size
+
+        def pixel(a, b, xg, yg): return np.array([[a, b], [b, a]]).repeat(xg, axis=2).repeat(
+            yg, axis=3).transpose(2, 0, 3, 1).reshape(2*a.shape[0]*xg, 2*a.shape[1]*yg)
+
+        def p1(ph, amp): return ph + np.arccos(amp)
+        def p2(ph, amp): return ph - np.arccos(amp)
+        ph_ref = pi/2
+
+        p1_data = p1(ph_pattern + ph_ref, amp_pattern) / (2 * pi)
+        p2_data = p2(ph_pattern + ph_ref, amp_pattern) / (2 * pi)
+
+        amp_phase = pixel(p1_data, p2_data, lens_size//2, lens_size//2)
+        amp_phase = amp_phase[:self.slm_res[0], :self.slm_res[1]]
+        X, Y = np.mgrid[0:lens_size*xp_size, 0:lens_size*yp_size]
+        phase_gradient = np.mod(8*k*X*np.sin(theta), 2*pi)
+
+        PG = np.kron(amp_pattern > 0, np.ones(
+            (lens_size, lens_size))) * phase_gradient
+        PG = PG[:self.slm_res[0], :self.slm_res[1]]
+
+        tot_phase = np.mod(amp_phase + PG, 1)
+        return tot_phase
+
+    def generate_pattern_binary(self, amp_pattern, ph_pattern):
+        k, theta = self.k, self.theta
+        lens_size = self.lens_size
+        xp_size, yp_size = self.xp_size, self.yp_size
+        def pixel(a, b, xg, yg): return np.array([[a, b], [b, a]]).repeat(xg, axis=2).repeat(
+            yg, axis=3).transpose(2, 0, 3, 1).reshape(2*a.shape[0]*xg, 2*a.shape[1]*yg)
+
+        def p1(ph, amp): return ph + np.arccos(amp)
+        def p2(ph, amp): return ph - np.arccos(amp)
+        ph_ref = pi/2
+
+        p1_data = p1(ph_pattern + ph_ref, amp_pattern) / (2 * pi)
+        p2_data = p2(ph_pattern + ph_ref, amp_pattern) / (2 * pi)
+
+        amp_phase = pixel(p1_data, p2_data, lens_size//2, lens_size//2)
+        amp_phase = amp_phase[:self.slm_res[0], :self.slm_res[1]]
+
+        tot_phase = amp_phase
+        return tot_phase
