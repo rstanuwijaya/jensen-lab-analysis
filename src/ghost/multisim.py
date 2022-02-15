@@ -53,7 +53,7 @@ class PathGenerator:
 
 
 class GhostSimulator:
-    def __init__(self, path, shape_slm, shape_cam, shape_mac, num_filters, shift=(0, 0), sigma=0, method='zigzag'):
+    def __init__(self, path, shape_slm, shape_cam, shape_mac, num_filters, shift=(0, 0), sigma=0, method='zigzag', mode='ideal'):
         self.path = path
         self.shape_slm = shape_slm  # SLM resolution
         self.shape_cam = shape_cam  # camera resolution
@@ -62,6 +62,7 @@ class GhostSimulator:
         self.num_filters = num_filters
         self.shift = shift
         self.method = method
+        self.mode = mode
         self.T = None  # 2d target image
         self.h = self.generate_hadamard()  # 2d hadamard matrix
         self.A = None
@@ -73,8 +74,9 @@ class GhostSimulator:
         self.reset_vars()
 
     def reset_vars(self):
-        if self.sigma == 0:
-            self.A, self.At = self.generate_cali_matrix_ideal()
+        if self.mode == 'ideal':
+            if self.sigma == 0:
+                self.A, self.At = self.generate_cali_matrix_ideal()
         else:
             self.A, self.At = self.generate_cali_matrix_gaussian()
         self.R = np.zeros(self.shape_mac)
@@ -96,6 +98,25 @@ class GhostSimulator:
         At = A.T/S
         return A, At
 
+    def generate_cali_matrix_ideal2(self):
+        cam_res = self.shape_cam
+        slm_res = self.shape_slm
+        mac_res = self.shape_mac
+        sigma = self.sigma
+        At = np.zeros((prod(cam_res), prod(slm_res)))
+        for i in range(prod(cam_res)):
+            u, v = i // cam_res[1], i % cam_res[1]
+            x = np.arange(0, slm_res[0], 1)
+            y = np.arange(0, slm_res[1], 1)
+            xv, yv = np.meshgrid(x, y)
+            z = np.logical_and(abs((xv - (v + 0.5)*mac_res[0] + 0.5)) <= sigma, abs((yv - (u+0.5)*mac_res[1]) + 0.5) <= sigma)
+            At[i] = z.flatten()
+        # S = At.T.sum(axis=1, keepdims=True)
+        # A = At.T/S
+        A = At.T
+        return A, At
+
+
     def generate_cali_matrix_gaussian(self):
         cam_res = self.shape_cam
         slm_res = self.shape_slm
@@ -107,8 +128,8 @@ class GhostSimulator:
             x = np.arange(0, slm_res[0], 1)
             y = np.arange(0, slm_res[1], 1)
             xv, yv = np.meshgrid(x, y)
-            xy = (xv - (u+0.5)*mac_res[0] + 0.5)**2 + \
-                (yv - (v+0.5)*mac_res[1] + 0.5)**2
+            xy = (xv - (v+0.5)*mac_res[0] + 0.5)**2 + \
+                (yv - (u+0.5)*mac_res[1] + 0.5)**2
             temp = 1/(2*np.pi*sigma**2)*np.exp(-xy/(2*sigma**2))
             At[i] = temp.flatten()
         S = At.T.sum(axis=1, keepdims=True)
@@ -153,6 +174,16 @@ class GhostSimulator:
         Si = Si[:self.shape_slm[0], :self.shape_slm[1]]
         return Si
 
+    def generate_filter2(self, i):
+        Si = self.generate_partial_filter(i//(3*3))
+        X = np.zeros((3, 3))
+        j = i % (3*3)
+        X[j//3, j%3] = 1
+        X = np.kron(np.ones((ceil(self.shape_cam[0]/3), ceil(self.shape_cam[1]/3))), X)
+        X = X[:self.shape_cam[0], :self.shape_cam[1]]
+        Si = np.kron(X, Si)
+        return Si
+
     def generate_single_pass_filter(self, i):
         # generate filter for one camera pixel
         u, v = i // self.shape_slm[1], i % self.shape_slm[1]
@@ -174,22 +205,27 @@ class GhostSimulator:
             self.R = PathGenerator.square(self.shape_mac, self.num_filters)
 
         Tk = self.T.flatten()
-        for i in range(self.shape_mac[0] * self.shape_mac[1]):
-            u, v = i // self.shape_mac[1], i % self.shape_mac[1]
+        self.I = np.empty((9*prod(self.shape_mac), prod(self.shape_cam)))
+
+        A, _ = self.generate_cali_matrix_ideal2()
+        self.A, self.At = self.generate_cali_matrix_ideal()
+        for i in range(9 * prod(self.shape_mac)):
+            j = i % prod(self.shape_mac)
+            u, v = j // self.shape_mac[1], j % self.shape_mac[1]
             if not self.R[u, v]:
                 continue
             k += 1
-            Sk = self.generate_filter(i)  # generate filter pattern
+            Sk = self.generate_filter2(i)  # generate filter pattern
             Sk = np.roll(Sk, self.shift[0], axis=0)
             Sk = np.roll(Sk, self.shift[1], axis=1)
             Sk = Sk.flatten()
 
             # simulate measurement
-            Ik = self.A.T @ (Tk*Sk)
+            Ik = A.T @ (Tk*Sk)
             self.I[i, :] = Ik.T  # store to the intensity matrix
 
             # reconstruct image
-            Sk = self.generate_filter(i).flatten()  # generate filter pattern
+            Sk = self.generate_filter2(i).flatten()  # generate filter pattern
             G2 += (self.A @ Ik) * Sk
 
         G2 = G2 / prod(self.shape_mac)
