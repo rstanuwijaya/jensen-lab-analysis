@@ -5,6 +5,7 @@ import random
 import os
 from PIL import Image
 import cv2
+from scipy.ndimage import convolve
 
 
 class PathGenerator:
@@ -53,7 +54,7 @@ class PathGenerator:
 
 
 class GhostSimulator:
-    def __init__(self, path, shape_slm, shape_cam, shape_mac, num_filters, shift=(0, 0), sigma=0, method='zigzag', mode='ideal'):
+    def __init__(self, path, shape_slm, shape_cam, shape_mac, num_filters, spacing=(1, 1), shift=(0, 0), sigma=0, method='zigzag', mode='ideal'):
         self.path = path
         self.shape_slm = shape_slm  # SLM resolution
         self.shape_cam = shape_cam  # camera resolution
@@ -63,6 +64,7 @@ class GhostSimulator:
         self.shift = shift
         self.method = method
         self.mode = mode
+        self.spacing = spacing
         self.T = None  # 2d target image
         self.h = self.generate_hadamard()  # 2d hadamard matrix
         self.A = None
@@ -75,12 +77,11 @@ class GhostSimulator:
 
     def reset_vars(self):
         if self.mode == 'ideal':
-            if self.sigma == 0:
-                self.A, self.At = self.generate_cali_matrix_ideal()
+            self.A, self.At = self.generate_cali_matrix_ideal()
         else:
             self.A, self.At = self.generate_cali_matrix_gaussian()
         self.R = np.zeros(self.shape_mac)
-        self.I = np.empty((prod(self.shape_mac), prod(self.shape_cam)))
+        self.I = np.empty((prod(self.spacing)*prod(self.shape_mac), prod(self.shape_cam)))
         self.I[:] = np.nan
         self.G2 = np.zeros(self.shape_slm)
 
@@ -165,6 +166,14 @@ class GhostSimulator:
         S = h[:, [v]] @ h[[u], :]
         return S
 
+    def select_active_subpixels(self, i):
+        X = np.zeros(self.spacing)
+        j = i % prod(self.spacing)
+        X[j//self.spacing[1], j%self.spacing[0]] = 1
+        X = np.kron(np.ones((ceil(self.shape_cam[0]/self.spacing[0]), ceil(self.shape_cam[1]/self.spacing[1]))), X)
+        X = X[:self.shape_cam[0], :self.shape_cam[1]]
+        return X
+
     def generate_filter(self, i):
         # tiled filter
         Si = self.generate_partial_filter(i)
@@ -175,12 +184,8 @@ class GhostSimulator:
         return Si
 
     def generate_filter2(self, i):
-        Si = self.generate_partial_filter(i//(3*3))
-        X = np.zeros((3, 3))
-        j = i % (3*3)
-        X[j//3, j%3] = 1
-        X = np.kron(np.ones((ceil(self.shape_cam[0]/3), ceil(self.shape_cam[1]/3))), X)
-        X = X[:self.shape_cam[0], :self.shape_cam[1]]
+        Si = self.generate_partial_filter(i//prod(self.spacing))
+        X = self.select_active_subpixels(i)
         Si = np.kron(X, Si)
         return Si
 
@@ -205,11 +210,8 @@ class GhostSimulator:
             self.R = PathGenerator.square(self.shape_mac, self.num_filters)
 
         Tk = self.T.flatten()
-        self.I = np.empty((9*prod(self.shape_mac), prod(self.shape_cam)))
 
-        A, _ = self.generate_cali_matrix_ideal2()
-        self.A, self.At = self.generate_cali_matrix_ideal()
-        for i in range(9 * prod(self.shape_mac)):
+        for i in range(prod(self.spacing) * prod(self.shape_mac)):
             j = i % prod(self.shape_mac)
             u, v = j // self.shape_mac[1], j % self.shape_mac[1]
             if not self.R[u, v]:
@@ -221,7 +223,12 @@ class GhostSimulator:
             Sk = Sk.flatten()
 
             # simulate measurement
-            Ik = A.T @ (Tk*Sk)
+            Ik = self.A.T @ (Tk*Sk)
+            Ik = Ik.reshape(self.shape_cam)
+            Ik = convolve(Ik, np.ones(self.spacing), mode='constant')
+            Ik = Ik * self.select_active_subpixels(i)
+            Ik = Ik.flatten()
+
             self.I[i, :] = Ik.T  # store to the intensity matrix
 
             # reconstruct image
