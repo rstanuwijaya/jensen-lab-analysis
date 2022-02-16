@@ -249,9 +249,9 @@ class GhostSimulator:
 
 
 class GhostAnalyser(GhostSimulator):
-    def __init__(self, path, shape_slm, shape_cam, shape_mac, crop, num_filters, shift=(0, 0), sigma=0, method='zigzag'):
+    def __init__(self, path, shape_slm, shape_cam, shape_mac, crop, num_filters, spacing=(1, 1), shift=(0, 0), sigma=0, method='zigzag'):
         super().__init__(path, shape_slm, shape_cam,
-                         shape_mac, num_filters, shift, sigma, method)
+                         shape_mac, num_filters, spacing, shift, sigma, method)
         self.crop = crop
 
     def run_simulation(self):
@@ -269,24 +269,31 @@ class GhostAnalyser(GhostSimulator):
             self.R = PathGenerator.square(self.shape_mac, self.num_filters)
 
         # Tk = self.T.flatten()
-        for i in range(self.shape_mac[0] * self.shape_mac[1]):
-            u, v = i // self.shape_mac[1], i % self.shape_mac[1]
+        for i in range(prod(self.spacing) * prod(self.shape_mac)):
+            j = i % prod(self.shape_mac)
+            u, v = j // self.shape_mac[1], j % self.shape_mac[1]
             if not self.R[u, v]:
                 continue
             k += 1
 
             # generate and shift the filter pattern
-            Sk = self.generate_filter(i)
+            Sk = self.generate_filter2(i)
             Sk = np.roll(Sk, self.shift[0], axis=0)
             Sk = np.roll(Sk, self.shift[1], axis=1)
             Sk = Sk.flatten()
 
             # difference imaging and resizing
+            
             Ik_p = np.loadtxt(self.path + f'{i}p.csv', delimiter=',')
             Ik_m = np.loadtxt(self.path + f'{i}m.csv', delimiter=',')
             Ik = Ik_p - Ik_m
             Ik = Ik[self.crop[0]:self.crop[1], self.crop[2]:self.crop[3]]
             Ik = cv2.resize(Ik, self.shape_cam, interpolation=cv2.INTER_AREA)
+            Ik = Ik.flatten()
+
+            Ik = Ik.reshape(self.shape_cam)
+            Ik = convolve(Ik, np.ones(self.spacing), mode='constant')
+            Ik = Ik * self.select_active_subpixels(i)
             Ik = Ik.flatten()
 
             # reconstruct image
@@ -324,7 +331,7 @@ class SLMPattern:
         amp_phase = pixel(p1_data, p2_data, lens_size//2, lens_size//2)
         amp_phase = amp_phase[:self.slm_res[0], :self.slm_res[1]]
         X, Y = np.mgrid[0:lens_size*xp_size, 0:lens_size*yp_size]
-        phase_gradient = np.mod(8*k*X*np.sin(theta), 2*pi)
+        phase_gradient = np.mod(8*k*X*np.sin(theta), 2*pi) / (2 * pi)
 
         PG = np.kron(amp_pattern > 0, np.ones(
             (lens_size, lens_size))) * phase_gradient
