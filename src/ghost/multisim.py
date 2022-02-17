@@ -197,6 +197,18 @@ class GhostSimulator:
         
         return S
 
+    def generate_cali_pattern(self, i):
+        # i range: prod(spacing) * prod(shape_mac)
+        X = self.select_active_subpixels(i)
+        j = i // prod(self.spacing)
+        S = np.zeros(self.shape_mac)
+        u, v = j // self.shape_mac[1], j % self.shape_mac[1]
+        S[u, v] = 1
+        X = np.kron(X, np.ones(self.shape_mac))
+        S = np.kron(np.ones(self.shape_cam), S)
+        S = S * X
+        return S
+
     def run_simulation(self):
         self.reset_vars()
         self.T = self.generate_image_from_file(self.path)  # 2d target image
@@ -249,9 +261,9 @@ class GhostSimulator:
 
 
 class GhostAnalyser(GhostSimulator):
-    def __init__(self, path, shape_slm, shape_cam, shape_mac, crop, num_filters, spacing=(1, 1), shift=(0, 0), sigma=0, method='zigzag'):
+    def __init__(self, path, shape_slm, shape_cam, shape_mac, crop, num_filters, spacing=(1, 1), shift=(0, 0), sigma=0, method='zigzag', mode='ideal'):
         super().__init__(path, shape_slm, shape_cam,
-                         shape_mac, num_filters, spacing, shift, sigma, method)
+                         shape_mac, num_filters, spacing, shift, sigma, method, mode)
         self.crop = crop
 
     def run_simulation(self):
