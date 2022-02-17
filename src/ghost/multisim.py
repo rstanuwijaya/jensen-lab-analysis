@@ -359,3 +359,66 @@ class SLMPattern:
 
         tot_phase = amp_phase
         return tot_phase
+
+class AlignmentHelper:
+    def __init__(self, slm_res):
+        self.shape_slm = slm_res
+    
+    def ones(self):
+        M = np.ones(self.shape_slm)
+        return M
+
+    def border(self, w):
+        shape_slm = self.shape_slm
+        M = np.zeros((shape_slm[0], shape_slm[1]))
+        M[:w, :] = 1
+        M[:, :w] = 1
+        M[-w:, :] = 1
+        M[:, -w:] = 1
+        return M
+ 
+    def arrow(self):
+        res = self.shape_slm
+        lud, rud = (res[1]//2, res[1]//2), (res[1]//2, res[1]//2)
+        lbd, rbd = (res[0] - lud[0], lud[1]), (rud[0], res[0] - rud[1]) 
+        RU = np.tri(lud[0])
+        LU = np.flip(np.tri(rud[0]), axis=1)
+        LB = np.hstack((np.zeros((lbd[0], ceil(lbd[1]/2))), np.ones((lbd[0], floor(lbd[1]/ 2)))))
+        RB = np.hstack((np.ones((rbd[0], floor(rbd[1]/2))), np.zeros((rbd[0], ceil(rbd[1]/ 2)))))
+        M = np.vstack((np.hstack((LU, RU)), np.hstack((LB, RB))))
+        return M
+
+    def squares(self, w, rep):
+        shape_slm = self.shape_slm
+        lu, ru = (0, 0), (0, shape_slm[1])
+        lb, rb = (shape_slm[0], 0), (shape_slm[0], shape_slm[1])
+        M = np.zeros((shape_slm[0], shape_slm[1]))
+
+        for i in range(rep):
+            M[lu[0]:lb[0], lu[1]:lb[1]+w] = 1
+            M[ru[0]:rb[0], ru[1]-w:rb[1]] = 1
+            M[lu[0]:ru[0]+w, lu[1]:ru[1]] = 1
+            M[lb[0]-w:rb[0], lb[1]:rb[1]] = 1
+
+            lu = (lu[0]+2*w, lu[1]+2*w)
+            ru = (ru[0]+2*w, ru[1]-2*w)
+            lb = (lb[0]-2*w, lb[1]+2*w)
+            rb = (rb[0]-2*w, rb[1]-2*w)
+
+        return M
+
+    def checkerboard(self, w):
+        shape_slm = self.shape_slm
+        reps = shape_slm[0]//w, shape_slm[1]//w
+        tile = np.array([[0, 1], [1, 0]]).repeat(w, axis=0).repeat(w, axis=1)
+        M = np.kron(np.ones(reps), tile)  
+        M = M[:shape_slm[0], :shape_slm[1]]
+        return M
+    
+    def from_img(self, path, threshold=None):
+        img = Image.open(path)
+        img = img.resize(self.shape_slm).convert('L')
+        M = np.array(img)/255
+        if threshold is not None:
+            M = M > threshold
+        return M
