@@ -269,8 +269,48 @@ class GhostAnalyser(GhostSimulator):
     def run_simulation(self):
         raise NotImplementedError("Class not for simulation")
 
+    def run_cali(self):
+        A = np.zeros_like(self.A)
+        for i in range(prod(self.spacing) * prod(self.shape_mac)):
+            X = self.select_active_subpixels(i)
+            j, k = i // prod(self.spacing), i % prod(self.spacing)
+            S = np.zeros(self.shape_mac)
+            u, v = j // self.shape_mac[1], j % self.shape_mac[1]
+            S[u, v] = 1
+            X = np.kron(X, np.ones(self.shape_mac))
+            S = np.kron(np.ones(self.shape_cam), S)
+            Si = S * X
+
+            Ik = np.loadtxt(self.path + f'cali/cali_{i}.csv', delimiter=',')
+            B = np.loadtxt(self.path + f'cali/0m.csv', delimiter=',')
+            Ik = Ik - B
+            Ik[Ik < 0] = 0
+            Ik = Ik[self.crop[0]:self.crop[1], self.crop[2]:self.crop[3]]
+            Ik = cv2.resize(Ik, self.shape_cam, interpolation=cv2.INTER_AREA)
+
+            X = self.select_active_subpixels(i)
+            for n, x in enumerate(np.argwhere(X == 1)):
+                Y = np.zeros(self.shape_cam)
+                Y[x[0], x[1]] = 1
+                Y = convolve(Y, np.ones((3, 3)), mode='constant')
+                Ik_ = Ik * Y
+                Ik_[Ik_ == 0] = np.min(Ik, axis=(0, 1))
+                index = np.argwhere(Si.flatten() == 1)[n]
+                S = np.sum(Ik_, axis=(0, 1))
+                A[index, :] = (Ik_/S).flatten() if S != 0 else 0
+
+        S = A.T.sum(axis=1, keepdims=True)
+        At = A.T/S
+
+        # plt.figure(figsize=(10, 10))
+        # plt.imshow(self.A)
+        # plt.axis('tight')
+        # plt.show()
+        return A, At
+
     def run_analysis(self):
         self.reset_vars()
+        self.A, self.At = self.run_cali()
         k = 0  # count of filters
         G2 = np.zeros(prod(self.shape_slm))
         if self.method == 'zigzag':
@@ -282,7 +322,7 @@ class GhostAnalyser(GhostSimulator):
 
         # Tk = self.T.flatten()
         for i in range(prod(self.spacing) * prod(self.shape_mac)):
-            j = i % prod(self.shape_mac)
+            j = i // prod(self.spacing)
             u, v = j // self.shape_mac[1], j % self.shape_mac[1]
             if not self.R[u, v]:
                 continue
