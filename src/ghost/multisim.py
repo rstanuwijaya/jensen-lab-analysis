@@ -310,7 +310,7 @@ class GhostAnalyser(GhostSimulator):
 
     def run_analysis(self):
         self.reset_vars()
-        self.A, self.At = self.run_cali()
+        # self.A, self.At = self.run_cali()
         k = 0  # count of filters
         G2 = np.zeros(prod(self.shape_slm))
         if self.method == 'zigzag':
@@ -429,6 +429,17 @@ class AlignmentHelper:
         M[:, -w:] = 1
         return M
  
+    def arrow(self):
+        res = self.shape_slm
+        lud, rud = (res[1]//2, res[1]//2), (res[1]//2, res[1]//2)
+        lbd, rbd = (res[0] - lud[0], lud[1]), (rud[0], res[0] - rud[1]) 
+        RU = np.tri(lud[0])
+        LU = np.flip(np.tri(rud[0]), axis=1)
+        LB = np.hstack((np.zeros((lbd[0], ceil(lbd[1]/2))), np.ones((lbd[0], floor(lbd[1]/ 2)))))
+        RB = np.hstack((np.ones((rbd[0], floor(rbd[1]/2))), np.zeros((rbd[0], ceil(rbd[1]/ 2)))))
+        M = np.vstack((np.hstack((LU, RU)), np.hstack((LB, RB))))
+        return M
+
     def arrow(self):
         res = self.shape_slm
         lud, rud = (res[1]//2, res[1]//2), (res[1]//2, res[1]//2)
