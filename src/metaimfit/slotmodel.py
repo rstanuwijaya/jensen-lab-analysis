@@ -2,11 +2,11 @@ import numpy as np
 from math import pi, exp, sin, cos, tan
 from scipy.special import erf
 
-
+verf = np.vectorize(erf)
 class SlotModel:
     @staticmethod
     def gaussian_flat(x, *, mu, w, s):
-        return -1. / 2. * (erf((2*mu - w - 2*x)/(2*np.sqrt(2)*s)) - erf((2*mu + w - 2*x)/(2*np.sqrt(2)*s)))
+        return -1. / 2. * (verf((2*mu - w - 2*x)/(2*np.sqrt(2)*s)) - verf((2*mu + w - 2*x)/(2*np.sqrt(2)*s)))
 
     @staticmethod
     def gaussian_slot(y, x, *, cy, cx, t, l, w, r):
