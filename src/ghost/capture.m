@@ -6,13 +6,13 @@ function OK = capture(FrameTime, AcqTime, filename)
     % global hax % #ok<NUSED>
     % initialize PF32
 
-    OK = pf_getLibraryStatus;
-    if(OK)
-        % Close the library if it is already open. The scripts will load it
-        % when needed.
-        pf_close
-    end
-    [pf32, alias, report] = pf_open;
+    % OK = pf_getLibraryStatus;
+    % if(OK)
+    %     % Close the library if it is already open. The scripts will load it
+    %     % when needed.
+    %     pf_close
+    % end
+    % [pf32, alias, report] = pf_open;
     % pf_setMode(pf32, 'photon_counting');
     % calllib(alias, 'setEnablePositionalData', pf32, 0);
     % calllib(alias, 'purgeBulkFrameBuffer', pf32);
@@ -22,11 +22,11 @@ function OK = capture(FrameTime, AcqTime, filename)
     % pf_getLibraryStatus;
 
     FrameNum = 5000
-    series = pf_getMultipleFrames(pf32, FrameNum);
-    series = rot90(series,3);
-    img = sum(series,3);
-    filename
-    writematrix(img, filename)
+    % series = pf_getMultipleFrames(pf32, FrameNum);
+    % series = rot90(series,3);
+    % img = sum(series,3);
+    % filename
+    % writematrix(img, filename)
 
     % pf_close()
     OK =0
